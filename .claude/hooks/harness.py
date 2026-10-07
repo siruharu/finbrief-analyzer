@@ -75,9 +75,11 @@ def rel_to_root(p: str) -> str | None:
         return None  # 프로젝트 밖 — 게이트 대상이 아니다
 
 
-def run(cmd: list[str], cwd: Path = ROOT, timeout: int = 120):
+def run(cmd: list[str] | str, cwd: Path = ROOT, timeout: int = 120):
+    # 문자열이면 셸로 돌린다 — 태스크의 verify 는 따옴표와 && 를 쓴다
     return subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout
+        cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout,
+        shell=isinstance(cmd, str),
     )
 
 
@@ -379,9 +381,9 @@ def cmd_task(argv: list[str]) -> int:
         if not t:
             print(f"없는 태스크: {argv[1]}", file=sys.stderr)
             return 1
-        cmd = (t.get("verify") or "").split() or _verify_command()
+        cmd = (t.get("verify") or "").strip() or _verify_command()
         if cmd:
-            print(f"완료 판정 실행: {' '.join(cmd)}")
+            print(f"완료 판정 실행: {cmd if isinstance(cmd, str) else ' '.join(cmd)}")
             try:
                 r = run(cmd, timeout=900)
             except Exception as e:

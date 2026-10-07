@@ -1,0 +1,94 @@
+{
+  "meta": {
+    "found": 195,
+    "returned": 3,
+    "limit": 3,
+    "page": 1
+  },
+  "data": [
+    {
+      "uuid": "d09a15f5-be78-4e6a-9cbf-cc4104294409",
+      "title": "Marvell Technology, Inc. (MRVL) Analyst/Investor Day - Slideshow",
+      "description": "2026-10-07. The following slide deck was published by Marvell Technology, Inc.",
+      "keywords": "",
+      "snippet": "To ensure this doesn't happen in the future, please enable Javascript and cookies in your browser.",
+      "url": "https://seekingalpha.com/article/4952406-marvell-technology-inc-mrvl-analyst-investor-day-slideshow",
+      "image_url": "https://example.com/og.png",
+      "language": "en",
+      "published_at": "2026-10-07T06:33:06.000000Z",
+      "source": "seekingalpha.com",
+      "relevance_score": null,
+      "entities": [
+        {
+          "symbol": "MRVL",
+          "name": "Marvell Technology, Inc.",
+          "exchange": null,
+          "exchange_long": null,
+          "country": "us",
+          "type": "equity",
+          "industry": "Technology",
+          "match_score": 20.1,
+          "sentiment_score": 0.0,
+          "highlights": []
+        }
+      ],
+      "similar": []
+    },
+    {
+      "uuid": "0b1c2d3e-0000-4000-8000-000000000002",
+      "title": "CNBC Daily Open: AI rally defies bond market rout",
+      "description": "  Stocks rose even as Treasury yields\n climbed.  ",
+      "keywords": "",
+      "snippet": "To ensure this doesn't happen in the future, please enable Javascript and cookies in your browser.",
+      "url": "https://www.cnbc.com/2026/10/07/cnbc-daily-open.html",
+      "image_url": "https://example.com/og.png",
+      "language": "en",
+      "published_at": "2026-10-07T06:28:35.000000Z",
+      "source": "cnbc.com",
+      "relevance_score": null,
+      "entities": [
+        {
+          "symbol": "MRVL",
+          "name": "Marvell Technology, Inc.",
+          "exchange": null,
+          "exchange_long": null,
+          "country": "us",
+          "type": "equity",
+          "industry": "Technology",
+          "match_score": 20.1,
+          "sentiment_score": 0.0,
+          "highlights": []
+        }
+      ],
+      "similar": []
+    },
+    {
+      "uuid": "0b1c2d3e-0000-4000-8000-000000000003",
+      "title": "Hormel Foods: A High-Yield Dividend King At A 13-Year Low",
+      "description": "",
+      "keywords": "",
+      "snippet": "To ensure this doesn't happen in the future, please enable Javascript and cookies in your browser.",
+      "url": "https://seekingalpha.com/article/4952400-hormel-foods",
+      "image_url": "https://example.com/og.png",
+      "language": "en",
+      "published_at": "2026-10-07T06:21:31.000000Z",
+      "source": "seekingalpha.com",
+      "relevance_score": null,
+      "entities": [
+        {
+          "symbol": "MRVL",
+          "name": "Marvell Technology, Inc.",
+          "exchange": null,
+          "exchange_long": null,
+          "country": "us",
+          "type": "equity",
+          "industry": "Technology",
+          "match_score": 20.1,
+          "sentiment_score": 0.0,
+          "highlights": []
+        }
+      ],
+      "similar": []
+    }
+  ]
+}

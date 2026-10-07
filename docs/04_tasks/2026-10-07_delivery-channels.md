@@ -38,6 +38,13 @@ next: implementation
 - 앱 비밀번호·DB 비밀번호는 `SecretStr`. 로그·예외·문서·커밋에 값이 남지 않게 한다.
 - 수신자 주소는 로그에 전체를 찍지 않는다 (앞 두 글자와 도메인만).
 
+## data-sources 구현 뒤 정해진 것 (2026-10-07 사용자 결정)
+아래 Task 별 메모와 어긋나면 이 절이 우선한다.
+- **표시 이름과 시장은 스냅샷에 들어 있다.** `Quote.name`, `Quote.market` 을 쓴다. 렌더러(Task 2)는 `Settings` 를 읽지 않는다.
+- **금리의 등락은 bp 로 표시한다.** `Quote.market is Market.RATE` 이면 `Quote.change_bp` 를 쓴다 (예: "국고채 3년 3.961% (+2.8bp)"). 지수는 `change_pct`(%), 환율(`Market.FX`)은 `change`(원)과 `change_pct` 를 쓴다. 금리에 `change_pct` 를 쓰면 3.933 → 3.961 이 "+0.71%" 로 나온다.
+- **국내 공휴일에도 국내 개장 브리핑은 보낸다.** 그 브리핑이 전하는 것은 간밤의 미국 시장이라 내용이 유효하다. 미국 개장 브리핑도 같다. 전하려는 시장이 휴장이었던 날은 `MarketSnapshot.is_closed(market)` 가 참이므로 본문 상단에 휴장 안내를 싣고 직전 거래일 값임을 밝힌다. 발송을 건너뛰지 않는다.
+- **뉴스는 수집 단계에서 출처당 15건·전체 80건으로만 자른다.** 그중 브리핑에 실을 몇 건을 고르는 일은 LLM 요약 단계의 몫이고, 그 리서치·분석은 아직 없다. Task 7 의 "단순 작성기 v0" 는 최신순 앞에서 정해진 건수만 싣는다.
+
 ## Task 간 의존 중 하네스에 못 건 것
 - **Task 7 은 `data-sources` 주제의 Task 10(`collect_snapshot`)이 끝나야 시작할 수 있다.** 하네스의 `--after` 는 같은 주제 안에서만 걸린다. Task 7 을 시작하기 전에 `stage task data-sources` 로 바꿔 Task 10 이 done 인지 확인한다.
 

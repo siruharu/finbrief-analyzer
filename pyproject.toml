@@ -7,15 +7,21 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "pydantic-settings",
+    "httpx==0.28.1",
+    "finance-datareader==0.9.202",
+    "yfinance==1.7.0",
+    "defusedxml==0.7.1",
+    "tzdata>=2026.5",
 ]
 
 [dependency-groups]
 dev = [
     "pytest",
     "pytest-cov",
-    "httpx",
     "ruff",
     "mypy",
+    "types-defusedxml",
+    "pandas-stubs>=3.0.5.260914",
 ]
 
 [build-system]
@@ -43,6 +49,11 @@ select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 python_version = "3.12"
 strict = true
 files = ["src", "tests"]
+
+# 타입 스텁이 없는 라이브러리. 어댑터 경계에서 도메인 모델로 바꿔 Any 가 새지 않게 한다.
+[[tool.mypy.overrides]]
+module = ["FinanceDataReader.*", "yfinance.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

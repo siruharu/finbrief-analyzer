@@ -1,0 +1,54 @@
+{
+  "status": "000",
+  "message": "정상",
+  "page_no": 1,
+  "page_count": 100,
+  "total_count": 4,
+  "total_page": 1,
+  "list": [
+    {
+      "corp_code": "00000000",
+      "corp_name": "SK디앤디",
+      "stock_code": "000000",
+      "corp_cls": "Y",
+      "report_nm": "[기재정정]주요사항보고서(유상증자결정)",
+      "rcept_no": "20261007000004",
+      "flr_nm": "SK디앤디",
+      "rcept_dt": "20261007",
+      "rm": ""
+    },
+    {
+      "corp_code": "00000000",
+      "corp_name": "씨에스윈드",
+      "stock_code": "000000",
+      "corp_cls": "Y",
+      "report_nm": "주요사항보고서(자기주식처분결정)   ",
+      "rcept_no": "20261007000347",
+      "flr_nm": "씨에스윈드",
+      "rcept_dt": "20261007",
+      "rm": ""
+    },
+    {
+      "corp_code": "00000000",
+      "corp_name": "한세엠케이",
+      "stock_code": "000000",
+      "corp_cls": "Y",
+      "report_nm": "주요사항보고서(자기전환사채만기전취득결정)",
+      "rcept_no": "20261007000206",
+      "flr_nm": "한세엠케이",
+      "rcept_dt": "20261007",
+      "rm": ""
+    },
+    {
+      "corp_code": "00000000",
+      "corp_name": "어제상사",
+      "stock_code": "000000",
+      "corp_cls": "Y",
+      "report_nm": "주요사항보고서(감자결정)",
+      "rcept_no": "20261006000111",
+      "flr_nm": "어제상사",
+      "rcept_dt": "20261006",
+      "rm": ""
+    }
+  ]
+}
