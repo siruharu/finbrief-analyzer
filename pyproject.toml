@@ -20,6 +20,7 @@ dev = [
     "ruff",
     "mypy",
     "types-defusedxml",
+    "pandas-stubs>=3.0.5.260914",
 ]
 
 [build-system]
