@@ -82,14 +82,14 @@
     {
       "id": 8,
       "title": "Marketaux 뉴스 어댑터",
-      "status": "doing",
+      "status": "done",
       "after": [
         2,
         3
       ],
       "verify": "uv run pytest tests/collect/test_news_marketaux.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "648c873"
     },
     {
       "id": 9,
