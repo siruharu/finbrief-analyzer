@@ -106,7 +106,7 @@
     {
       "id": 10,
       "title": "수집 조립과 휴장 판정",
-      "status": "todo",
+      "status": "doing",
       "after": [
         5,
         7,
