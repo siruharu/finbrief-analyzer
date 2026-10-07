@@ -42,6 +42,9 @@ next: implementation
 - **Task 2**: 값은 `float`. `Quote` 는 심볼·종가·전일 종가·기준일만 가진다. 금리·환율도 같은 `Quote` 로 싣는다.
 - **Task 3**: 기본 시세 심볼은 `^KS11`, `^KQ11`, `US500`, `IXIC`, `DJI`, `US10YT` (국내 2·미국 3·미 국채 1). **환율은 심볼 목록에서 뺀다.** 의존성에 `defusedxml` 추가.
 - **Task 5**: 국내 지수의 예비는 yfinance 가 아니라 **네이버**(`fchart.stock.naver.com/siseJson.nhn`)다. 미국 지수의 예비는 yfinance 그대로.
+- **Task 5 를 둘로 나눴다.** 네이버 어댑터가 더해져 한 커밋으로는 크다.
+  - **Task 11** (먼저): 예비 어댑터 두 개. `quotes_yf.py`(미국 지수·미 국채), `quotes_naver.py`(국내 지수). 판정 파일은 `tests/collect/test_quotes_backup.py`.
+  - **Task 5** (나중): `quotes_fallback.py` 의 폴백 합성만. Task 11 뒤에 한다 — 하네스에는 이 순서를 걸지 못했다(`--after` 는 추가할 때만 줄 수 있다).
 - **Task 6**: 막지 않는다. ECOS 로 기준금리·국고채 3년·10년과 **원/달러 매매기준율**을 가져온다.
 
 ## Task 별 설계 메모
