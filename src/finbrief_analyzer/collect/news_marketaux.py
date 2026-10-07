@@ -22,15 +22,24 @@ logger = logging.getLogger(__name__)
 SOURCE = "marketaux"
 URL = "https://api.marketaux.com/v1/news/all"
 ARTICLES_PER_PAGE = 3
+# Market-wide terms; "|" means OR. Without a search most results are single-stock pieces.
+MARKET_SEARCH = '"Wall Street" | "S&P 500" | Nasdaq | "Federal Reserve" | Treasury'
 
 
 class MarketauxNewsProvider:
     name = SOURCE
 
-    def __init__(self, client: httpx.Client, token: SecretStr, max_calls: int) -> None:
+    def __init__(
+        self,
+        client: httpx.Client,
+        token: SecretStr,
+        max_calls: int,
+        search: str = MARKET_SEARCH,
+    ) -> None:
         self._client = client
         self._token = token
         self._max_calls = max_calls
+        self._search = search
         hide_from_http_log(token)
 
     def get_news(self, since: datetime) -> Sequence[NewsItem]:
@@ -61,6 +70,7 @@ class MarketauxNewsProvider:
             "language": "en",
             # The country of the companies an article is about, not of the publisher.
             "countries": "us",
+            "search": self._search,
             "limit": str(ARTICLES_PER_PAGE),
             "published_after": since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M"),
             "page": str(page),

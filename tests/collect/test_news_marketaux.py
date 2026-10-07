@@ -99,6 +99,32 @@ def test_request_asks_for_us_english_news_since_the_given_instant_in_utc() -> No
     assert params["page"] == "1"
 
 
+def test_request_searches_for_market_wide_terms_rather_than_any_company_news() -> None:
+    # given: without a search, most results were single-stock slide decks (seen live)
+    handler, seen = _pages(httpx.Response(200, json=EMPTY))
+
+    # when
+    _provider(handler).get_news(SINCE)
+
+    # then
+    search = seen[0].url.params["search"]
+    assert '"S&P 500"' in search
+    assert '"Federal Reserve"' in search
+    assert "|" in search
+
+
+def test_search_terms_can_be_replaced() -> None:
+    # given
+    handler, seen = _pages(httpx.Response(200, json=EMPTY))
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    # when
+    MarketauxNewsProvider(client, SecretStr(TOKEN), max_calls=1, search="oil").get_news(SINCE)
+
+    # then
+    assert seen[0].url.params["search"] == "oil"
+
+
 def test_pages_are_requested_only_up_to_the_call_limit() -> None:
     # given: an API that always has more
     seen: list[str] = []
