@@ -130,18 +130,18 @@
     {
       "id": 12,
       "title": "Marketaux 시황 검색어 필터",
-      "status": "doing",
+      "status": "done",
       "after": [
         8
       ],
       "verify": "uv run pytest tests/collect/test_news_marketaux.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "b84884a"
     },
     {
       "id": 13,
       "title": "시세 표시 이름·시장·등락폭을 스냅샷에 싣기",
-      "status": "todo",
+      "status": "doing",
       "after": [
         10
       ],
