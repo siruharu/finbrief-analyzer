@@ -5,7 +5,7 @@ topic: data-sources
 created: 2026-10-07
 status: done
 source_task: "[[2026-10-07_data-sources]]"
-commits: []
+commits: [ca6f80c]
 blog_candidate: true
 tags: [implementation, poc]
 ---
@@ -56,10 +56,17 @@ $ uv run pytest
 TOTAL                                       43      4    91%
 2 passed, 1 warning in 0.10s
 ```
-Task 의 완료 판정(문서에 6개 출처 이름이 있는지)은 `task done 1` 이 다시 돌린다.
+`task done 1` 은 처음에 거부됐다. 문서가 아니라 하네스 쪽 문제였다 — verify 문자열을 `.split()` 으로 쪼개 셸 없이 실행해서
+`python -c "import pathlib;..."` 의 따옴표 안 공백에서 명령이 잘렸다 (`SyntaxError: unterminated string literal`).
+`&&` 로 이은 Task 2~10 의 verify 도 같은 이유로 돌 수 없었다. 사용자 확인을 받고 `task done` 이 verify 문자열을 셸로 실행하도록 고쳤다 (별도 fix 커밋).
+```
+완료 판정 실행: python -c "import pathlib;t=pathlib.Path('docs/01_research/2026-10-07_data-source-poc.md')..."
+완료: [x] 1. PoC: 출처별 심볼·가용성·금리 출처·RSS 구조 확인
+```
 
 ## 발견한 이슈 (이번 범위 밖)
 - [ ] `uv sync` 가 `uv.lock` 을 새로 만들었다. 저장소에 잠금 파일이 없었다. 커밋 여부를 정해야 한다 (Task 3 에서 의존성을 고정할 때 함께 다루는 것이 자연스럽다).
+- [ ] **종료 게이트가 이 PC 에서 실제로는 돌지 않는다.** `make` 가 없어 `_verify_command()` 가 `[WinError 2]` 로 죽고, 하네스는 이를 "내부 오류(무시하고 진행)"으로 넘긴다. `state.json` 의 `verify` 를 지정하거나 `make` 를 설치해야 한다. 이번에는 고치지 않았다.
 - [ ] 하네스가 Windows 콘솔(cp949)에서 `—` 를 출력하다 죽는다. `PYTHONUTF8=1` 을 주면 돈다.
 - [ ] 이 PC 에 git 사용자 정보가 설정돼 있지 않다. 이번 커밋은 기존 커밋의 작성자 정보를 `-c` 로 넘겨 만들었다.
 - [ ] 매일경제 RSS 의 `+09:00` 을 `parsedate_to_datetime` 이 시간대 없이 읽는다 (Task 7 에서 처리).
