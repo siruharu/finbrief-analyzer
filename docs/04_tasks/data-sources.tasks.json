@@ -1,0 +1,120 @@
+{
+  "topic": "data-sources",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "PoC: 출처별 심볼·가용성·금리 출처·RSS 구조 확인",
+      "status": "todo",
+      "after": [],
+      "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-07_data-source-poc.md').read_text(encoding='utf-8');assert all(k in t for k in ['FinanceDataReader', 'yfinance', 'ECOS', 'RSS', 'Marketaux', 'DART'])\"",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 2,
+      "title": "도메인 모델과 제공자 인터페이스",
+      "status": "todo",
+      "after": [
+        1
+      ],
+      "verify": "uv run pytest tests/collect/test_models.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 3,
+      "title": "설정과 의존성 (버전 고정)",
+      "status": "todo",
+      "after": [
+        1
+      ],
+      "verify": "uv run pytest tests/test_config.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 4,
+      "title": "FinanceDataReader 시세 어댑터",
+      "status": "todo",
+      "after": [
+        2,
+        3
+      ],
+      "verify": "uv run pytest tests/collect/test_quotes_fdr.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 5,
+      "title": "yfinance 예비 어댑터와 폴백 합성",
+      "status": "todo",
+      "after": [
+        4
+      ],
+      "verify": "uv run pytest tests/collect/test_quotes_fallback.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 6,
+      "title": "금리 어댑터 (PoC 결과에 따라 조건부)",
+      "status": "todo",
+      "after": [
+        2,
+        3
+      ],
+      "verify": "uv run pytest tests/collect/test_rates.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 7,
+      "title": "언론사 RSS 뉴스 어댑터",
+      "status": "todo",
+      "after": [
+        2,
+        3
+      ],
+      "verify": "uv run pytest tests/collect/test_news_rss.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 8,
+      "title": "Marketaux 뉴스 어댑터",
+      "status": "todo",
+      "after": [
+        2,
+        3
+      ],
+      "verify": "uv run pytest tests/collect/test_news_marketaux.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 9,
+      "title": "DART 공시 어댑터",
+      "status": "todo",
+      "after": [
+        2,
+        3
+      ],
+      "verify": "uv run pytest tests/collect/test_news_dart.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 10,
+      "title": "수집 조립과 휴장 판정",
+      "status": "todo",
+      "after": [
+        5,
+        7,
+        8
+      ],
+      "verify": "uv run pytest tests/collect/test_service.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    }
+  ]
+}

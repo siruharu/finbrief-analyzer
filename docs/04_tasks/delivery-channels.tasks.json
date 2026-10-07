@@ -1,0 +1,92 @@
+{
+  "topic": "delivery-channels",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "PoC: Gmail SMTP 발송·AWS 로그인·스케줄러·마이그레이션 위치 확인",
+      "status": "todo",
+      "after": [],
+      "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-07_delivery-poc.md').read_text(encoding='utf-8');assert all(k in t for k in ['smtp.gmail.com', 'DKIM', 'EventBridge', 'RunTask'])\"",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 2,
+      "title": "브리핑 모델, Notifier 인터페이스, 렌더러",
+      "status": "todo",
+      "after": [
+        1
+      ],
+      "verify": "uv run pytest tests/deliver/test_render.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 3,
+      "title": "DB 기반 (엔진·세션·마이그레이션 환경)",
+      "status": "todo",
+      "after": [
+        1
+      ],
+      "verify": "uv run pytest tests/store/test_db.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 4,
+      "title": "수신자·발송 기록 스키마와 저장소",
+      "status": "todo",
+      "after": [
+        3
+      ],
+      "verify": "uv run pytest tests/store && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 5,
+      "title": "SMTP Notifier",
+      "status": "todo",
+      "after": [
+        2
+      ],
+      "verify": "uv run pytest tests/deliver/test_smtp.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 6,
+      "title": "발송 조율 (선점 → 발송 → 기록)",
+      "status": "todo",
+      "after": [
+        4,
+        5
+      ],
+      "verify": "uv run pytest tests/deliver/test_dispatch.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 7,
+      "title": "단순 작성기 v0 와 작업 엔트리포인트",
+      "status": "todo",
+      "after": [
+        6
+      ],
+      "verify": "uv run pytest tests/jobs && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 8,
+      "title": "인프라: 비밀값, 스케줄, 실패 알람",
+      "status": "todo",
+      "after": [
+        7
+      ],
+      "verify": "terraform -chdir=deploy/terraform/service init -backend=false && terraform -chdir=deploy/terraform/service validate",
+      "note": "",
+      "commit": null
+    }
+  ]
+}
