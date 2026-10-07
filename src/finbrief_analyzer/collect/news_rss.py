@@ -1,6 +1,5 @@
 """Korean news from publisher RSS feeds. Only feed entries are read, never article pages."""
 
-import html
 import logging
 import re
 from collections.abc import Sequence
@@ -14,14 +13,13 @@ from defusedxml import DefusedXmlException
 from defusedxml.ElementTree import fromstring
 
 from finbrief_analyzer.collect.models import CollectError, NewsItem
+from finbrief_analyzer.collect.text import plain_text
 
 logger = logging.getLogger(__name__)
 
 SOURCE = "rss"
 # hankyung.com and mk.co.kr answer 403 to the default "python-httpx" agent.
 USER_AGENT = "finbrief-analyzer/0.1"
-_TAG = re.compile(r"<[^>]+>")
-_SPACE = re.compile(r"\s+")
 # mk.co.kr writes "+09:00"; RFC 822 wants "+0900" and the parser drops the zone otherwise.
 _COLON_ZONE = re.compile(r"([+-]\d{2}):(\d{2})$")
 _DECLARATION = re.compile(rb"\s*<\?xml[^>]*?encoding=[\"']([\w.-]+)[\"'][^>]*\?>")
@@ -87,12 +85,12 @@ def _to_utf8(xml: bytes) -> bytes:
 
 def _to_item(element: Element, source: str) -> NewsItem | None:
     """Build a NewsItem, or None when the entry lacks a title, a web link or a usable time."""
-    title = _strip_html(element.findtext("title") or "")
+    title = plain_text(element.findtext("title") or "")
     link = (element.findtext("link") or "").strip()
     published_at = _parse_time(element.findtext("pubDate") or "")
     if not title or published_at is None or urlsplit(link).scheme not in ("http", "https"):
         return None
-    summary = _strip_html(element.findtext("description") or "")
+    summary = plain_text(element.findtext("description") or "")
     return NewsItem(
         title=title,
         link=link,
@@ -108,11 +106,6 @@ def _parse_time(text: str) -> datetime | None:
     except (TypeError, ValueError):
         return None
     return parsed if parsed.utcoffset() is not None else None
-
-
-def _strip_html(text: str) -> str:
-    """Remove tags, decode entities and collapse whitespace. Output is plain text, not safe HTML."""
-    return _SPACE.sub(" ", html.unescape(_TAG.sub(" ", text))).strip()
 
 
 def _host(url: str) -> str:

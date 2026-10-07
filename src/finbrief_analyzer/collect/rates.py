@@ -14,6 +14,7 @@ from pydantic import SecretStr
 
 from finbrief_analyzer.collect.models import CollectError, Quote
 from finbrief_analyzer.collect.quotes_base import Row, collect_each, quote_from_rows, window_start
+from finbrief_analyzer.collect.redact import hide_from_http_log
 
 SOURCE = "ecos"
 BASE_URL = "https://ecos.bok.or.kr/api/StatisticSearch"
@@ -51,6 +52,7 @@ class EcosRateProvider:
         self._api_key = api_key
         self._today = today
         self._series = {s.symbol: s for s in series}
+        hide_from_http_log(api_key)
 
     def get_rates(self) -> Sequence[Quote]:
         """Return a quote per configured series that has data; raise only if none has."""

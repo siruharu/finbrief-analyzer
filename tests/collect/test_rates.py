@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -182,3 +183,18 @@ def test_provider_satisfies_the_rate_port() -> None:
 
     # then
     assert provider.name == "ecos"
+
+
+def test_api_key_is_masked_in_the_http_client_request_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # given: httpx logs each request line with the full URL at INFO
+    provider = _provider(lambda request: httpx.Response(200, json=SAMPLE))
+
+    # when
+    with caplog.at_level(logging.DEBUG):
+        provider.get_rates()
+
+    # then
+    assert "StatisticSearch" in caplog.text
+    assert KEY not in caplog.text
