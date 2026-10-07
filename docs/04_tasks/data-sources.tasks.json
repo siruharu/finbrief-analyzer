@@ -70,14 +70,14 @@
     {
       "id": 7,
       "title": "언론사 RSS 뉴스 어댑터",
-      "status": "doing",
+      "status": "done",
       "after": [
         2,
         3
       ],
       "verify": "uv run pytest tests/collect/test_news_rss.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "3a0e8b5"
     },
     {
       "id": 8,
