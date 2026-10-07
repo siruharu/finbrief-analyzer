@@ -21,9 +21,9 @@ DEFAULT_QUOTE_SYMBOLS = (
     QuoteSymbol(symbol="^KS11", name="KOSPI", market=Market.KR),
     QuoteSymbol(symbol="^KQ11", name="KOSDAQ", market=Market.KR),
     QuoteSymbol(symbol="US500", name="S&P 500", market=Market.US),
-    QuoteSymbol(symbol="IXIC", name="NASDAQ", market=Market.US),
-    QuoteSymbol(symbol="DJI", name="Dow Jones", market=Market.US),
-    QuoteSymbol(symbol="US10YT", name="US 10Y Treasury", market=Market.RATE),
+    QuoteSymbol(symbol="IXIC", name="나스닥", market=Market.US),
+    QuoteSymbol(symbol="DJI", name="다우존스", market=Market.US),
+    QuoteSymbol(symbol="US10YT", name="미 국채 10년", market=Market.RATE),
 )
 
 DEFAULT_KR_RSS_FEEDS = (

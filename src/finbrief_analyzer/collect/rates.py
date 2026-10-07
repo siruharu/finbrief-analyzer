@@ -5,14 +5,14 @@ docs/01_research/2026-10-07_data-source-poc.md.
 """
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from typing import Any
 
 import httpx
 from pydantic import SecretStr
 
-from finbrief_analyzer.collect.models import CollectError, Quote
+from finbrief_analyzer.collect.models import CollectError, Market, Quote
 from finbrief_analyzer.collect.quotes_base import Row, collect_each, quote_from_rows, window_start
 from finbrief_analyzer.collect.redact import hide_from_http_log
 
@@ -26,15 +26,18 @@ MAX_ROWS = 100
 @dataclass(frozen=True, slots=True)
 class EcosSeries:
     symbol: str
+    name: str
+    market: Market
     stat_code: str
     item_code: str
 
 
 DEFAULT_SERIES = (
-    EcosSeries(symbol="KR_BASE_RATE", stat_code="722Y001", item_code="0101000"),
-    EcosSeries(symbol="KR3YT", stat_code="817Y002", item_code="010200000"),
-    EcosSeries(symbol="KR10YT", stat_code="817Y002", item_code="010210000"),
-    EcosSeries(symbol="USD/KRW", stat_code="731Y001", item_code="0000001"),
+    EcosSeries("KR_BASE_RATE", "한국은행 기준금리", Market.RATE, "722Y001", "0101000"),
+    EcosSeries("KR3YT", "국고채 3년", Market.RATE, "817Y002", "010200000"),
+    EcosSeries("KR10YT", "국고채 10년", Market.RATE, "817Y002", "010210000"),
+    # The Bank of Korea base rate for the day, not a live market quote.
+    EcosSeries("USD/KRW", "원/달러 매매기준율", Market.FX, "731Y001", "0000001"),
 )
 
 
@@ -63,7 +66,8 @@ class EcosRateProvider:
         series = self._series[symbol]
         start = window_start(today)
         payload = self._request(series, start, today)
-        return quote_from_rows(SOURCE, symbol, _parse(symbol, payload), start)
+        quote = quote_from_rows(SOURCE, symbol, _parse(symbol, payload), start)
+        return replace(quote, name=series.name, market=series.market)
 
     def _request(self, series: EcosSeries, start: date, end: date) -> Any:
         """Fetch one series. Any: the decoded JSON document, validated in _parse."""

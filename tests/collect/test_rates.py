@@ -9,13 +9,13 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from finbrief_analyzer.collect.models import CollectError
+from finbrief_analyzer.collect.models import CollectError, Market
 from finbrief_analyzer.collect.ports import RateProvider
 from finbrief_analyzer.collect.rates import DEFAULT_SERIES, EcosRateProvider, EcosSeries
 
 TODAY = date(2026, 10, 7)
 KEY = "SECRETKEY0123456789A"
-KTB3Y = EcosSeries(symbol="KR3YT", stat_code="817Y002", item_code="010200000")
+KTB3Y = EcosSeries("KR3YT", "국고채 3년", Market.RATE, "817Y002", "010200000")
 # Any: JSON documents.
 SAMPLE: dict[str, Any] = json.loads(
     (Path(__file__).parent / "fixtures" / "ecos_rate.json").read_text(encoding="utf-8")
@@ -136,7 +136,9 @@ def test_timeout_is_translated_to_collect_error_without_the_url() -> None:
 
 def test_failed_series_is_left_out_while_the_others_are_returned() -> None:
     # given
-    fx = EcosSeries(symbol="USD/KRW", stat_code="731Y001", item_code="0000001")
+    fx = EcosSeries(
+        symbol="USD/KRW", name="원/달러", market=Market.FX, stat_code="731Y001", item_code="0000001"
+    )
 
     def handler(request: httpx.Request) -> httpx.Response:
         if "731Y001" in request.url.path:
@@ -198,3 +200,25 @@ def test_api_key_is_masked_in_the_http_client_request_log(
     # then
     assert "StatisticSearch" in caplog.text
     assert KEY not in caplog.text
+
+
+def test_quotes_carry_the_display_name_and_market_of_their_series() -> None:
+    # given
+    provider = _provider(lambda request: httpx.Response(200, json=SAMPLE))
+
+    # when
+    (quote,) = provider.get_rates()
+
+    # then
+    assert quote.name == "국고채 3년"
+    assert quote.market is Market.RATE
+
+
+def test_default_series_label_the_exchange_rate_as_fx_and_the_rest_as_rates() -> None:
+    # given / when
+    markets = {s.symbol: s.market for s in DEFAULT_SERIES}
+
+    # then
+    assert markets["USD/KRW"] is Market.FX
+    assert all(m is Market.RATE for symbol, m in markets.items() if symbol != "USD/KRW")
+    assert all(s.name for s in DEFAULT_SERIES)

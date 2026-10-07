@@ -116,6 +116,20 @@ def test_us_open_slot_holds_kr_indices_fx_and_news_since_this_morning() -> None:
     assert news.since == [datetime(2026, 10, 7, 8, 30, tzinfo=KST)]
 
 
+def test_quotes_are_labelled_with_the_configured_name_and_market() -> None:
+    # given: adapters return symbols only
+    providers = Providers(quotes=_us_quotes(), rates=_Rates())
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+
+    # then: rate provider quotes are passed through as the provider labelled them
+    labels = {q.symbol: (q.name, q.market) for q in snapshot.quotes}
+    assert labels["US500"] == ("S&P 500", Market.US)
+    assert labels["US10YT"] == ("미 국채 10년", Market.RATE)
+    assert labels["USD/KRW"] == ("", None)
+
+
 def test_failing_news_provider_is_recorded_as_missing_and_the_rest_is_kept() -> None:
     # given
     providers = Providers(

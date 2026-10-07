@@ -52,6 +52,52 @@ def test_quote_change_is_none_when_prev_close_is_zero() -> None:
     assert quote.change_pct is None
 
 
+def test_quote_change_is_the_difference_in_the_quoted_unit() -> None:
+    # given: an exchange rate that fell from 1358.5 to 1343.4
+    quote = Quote(symbol="USD/KRW", close=1343.4, prev_close=1358.5, as_of=date(2026, 10, 7))
+
+    # when / then
+    assert quote.change == pytest.approx(-15.1)
+
+
+def test_rate_change_is_reported_in_basis_points_not_as_a_percentage_of_the_rate() -> None:
+    # given: a yield that rose from 3.933% to 3.961%
+    quote = Quote(symbol="KR3YT", close=3.961, prev_close=3.933, as_of=date(2026, 10, 7))
+
+    # when / then: +2.8bp, which change_pct would call "+0.71%"
+    assert quote.change_bp == pytest.approx(2.8)
+    assert quote.change_pct == pytest.approx(0.7119, abs=1e-3)
+
+
+def test_quote_change_is_none_without_a_usable_prev_close() -> None:
+    # given
+    alone = Quote(symbol="KR3YT", close=3.961, as_of=date(2026, 10, 7))
+    broken = Quote(symbol="KR3YT", close=3.961, prev_close=float("nan"), as_of=date(2026, 10, 7))
+
+    # when / then
+    assert alone.change is None
+    assert alone.change_bp is None
+    assert broken.change is None
+
+
+def test_quote_change_is_zero_not_none_when_the_value_did_not_move() -> None:
+    # given: the policy rate on a day without a decision
+    quote = Quote(symbol="KR_BASE_RATE", close=3.0, prev_close=3.0, as_of=date(2026, 10, 5))
+
+    # when / then
+    assert quote.change == 0.0
+    assert quote.change_bp == 0.0
+
+
+def test_quote_is_unlabelled_until_the_assembly_names_it() -> None:
+    # given / when: adapters know symbols only
+    quote = Quote(symbol="^KS11", close=1.0, as_of=date(2026, 10, 7))
+
+    # then
+    assert quote.name == ""
+    assert quote.market is None
+
+
 def test_quote_rejects_nan_close() -> None:
     # given: sources return NaN closes for unfinished rows (seen in the PoC)
     # when / then

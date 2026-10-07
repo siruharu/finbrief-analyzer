@@ -3,7 +3,7 @@
 import logging
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta
 from functools import partial
 from typing import Protocol
@@ -64,7 +64,7 @@ def collect_snapshot(
     if now.utcoffset() is None:
         raise ValueError("now must have a timezone")
     wanted = [s for s in symbols if s.market in SLOT_MARKETS[slot]]
-    quotes = _collect_quotes(providers.quotes, [s.symbol for s in wanted])
+    quotes = _labelled(_collect_quotes(providers.quotes, [s.symbol for s in wanted]), wanted)
     rates, rates_missing = _collect_rates(providers.rates)
     news, news_missing = _collect_news(providers.news, now - NEWS_LOOKBACK[slot])
     return MarketSnapshot(
@@ -72,7 +72,7 @@ def collect_snapshot(
         quotes=(*quotes.quotes, *rates),
         news=news,
         missing=(*quotes.missing, *rates_missing, *news_missing),
-        closed_markets=_closed_markets(quotes.quotes, wanted, now),
+        closed_markets=_closed_markets(quotes.quotes, now),
     )
 
 
@@ -86,14 +86,11 @@ def expected_session(market: Market, now: datetime) -> date:
     return day
 
 
-def _closed_markets(
-    quotes: Sequence[Quote], wanted: Sequence[QuoteSymbol], now: datetime
-) -> frozenset[Market]:
+def _closed_markets(quotes: Sequence[Quote], now: datetime) -> frozenset[Market]:
     """A market is closed when one of its indices has no row for the expected session."""
-    market_of = {s.symbol: s.market for s in wanted}
     closed: set[Market] = set()
     for quote in quotes:
-        market = market_of.get(quote.symbol)
+        market = quote.market
         if market in MARKET_CLOSE and quote.as_of < expected_session(market, now):
             closed.add(market)
     return frozenset(closed)
@@ -105,6 +102,18 @@ def _collect_quotes(collector: QuoteCollector | None, symbols: Sequence[str]) ->
         return nothing
     result = _attempt("quotes", lambda: collector.get_quotes(symbols))
     return nothing if result is None else result
+
+
+def _labelled(result: QuoteResult, wanted: Sequence[QuoteSymbol]) -> QuoteResult:
+    """Attach the configured display name and market to each quote."""
+    by_symbol = {s.symbol: s for s in wanted}
+    quotes = tuple(
+        replace(q, name=by_symbol[q.symbol].name, market=by_symbol[q.symbol].market)
+        if q.symbol in by_symbol
+        else q
+        for q in result.quotes
+    )
+    return QuoteResult(quotes=quotes, missing=result.missing)
 
 
 def _collect_rates(provider: RateProvider | None) -> tuple[tuple[Quote, ...], tuple[str, ...]]:

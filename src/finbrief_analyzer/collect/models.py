@@ -36,17 +36,35 @@ class Quote:
     close: float
     as_of: date
     prev_close: float | None = None
+    # Display label and market. Adapters know symbols only; the assembly fills these in.
+    name: str = ""
+    market: Market | None = None
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.close):
             raise ValueError(f"close must be a finite number: {self.symbol}")
 
     @property
-    def change_pct(self) -> float | None:
-        """Change from the previous close in percent, or None if unknown."""
-        if self.prev_close is None or self.prev_close == 0 or math.isnan(self.prev_close):
+    def change(self) -> float | None:
+        """Change from the previous close in the quoted unit, or None if unknown."""
+        if self.prev_close is None or math.isnan(self.prev_close):
             return None
-        return (self.close - self.prev_close) / self.prev_close * 100
+        return self.close - self.prev_close
+
+    @property
+    def change_pct(self) -> float | None:
+        """Change from the previous close in percent, or None if unknown.
+
+        Meant for indices and exchange rates. For a rate, use change_bp instead.
+        """
+        if self.change is None or self.prev_close == 0 or self.prev_close is None:
+            return None
+        return self.change / self.prev_close * 100
+
+    @property
+    def change_bp(self) -> float | None:
+        """Change in basis points, for values quoted in percent (Market.RATE)."""
+        return None if self.change is None else self.change * 100
 
 
 @dataclass(frozen=True, slots=True)
