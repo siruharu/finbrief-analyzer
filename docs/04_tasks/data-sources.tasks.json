@@ -119,13 +119,13 @@
     {
       "id": 11,
       "title": "yfinance·네이버 예비 시세 어댑터 (Task 5 에서 분리)",
-      "status": "doing",
+      "status": "done",
       "after": [
         4
       ],
       "verify": "uv run pytest tests/collect/test_quotes_backup.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "a55a32c"
     }
   ]
 }
