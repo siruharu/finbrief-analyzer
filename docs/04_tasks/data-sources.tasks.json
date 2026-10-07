@@ -4,7 +4,7 @@
     {
       "id": 1,
       "title": "PoC: 출처별 심볼·가용성·금리 출처·RSS 구조 확인",
-      "status": "todo",
+      "status": "doing",
       "after": [],
       "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-07_data-source-poc.md').read_text(encoding='utf-8');assert all(k in t for k in ['FinanceDataReader', 'yfinance', 'ECOS', 'RSS', 'Marketaux', 'DART'])\"",
       "note": "",
