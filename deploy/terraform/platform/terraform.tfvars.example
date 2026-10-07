@@ -1,0 +1,19 @@
+# cp terraform.tfvars.example terraform.tfvars 후 채운다 (terraform.tfvars 는 git 제외)
+
+# ── 네트워크: 둘 중 하나 ──
+# (1) 아무것도 안 쓰면 VPC 10.0.0.0/16 을 새로 만든다 (퍼블릭 2 · 프라이빗 2 · NAT 1)
+# azs        = ["ap-northeast-2a", "ap-northeast-2c"]
+# nat_per_az = true # AZ 장애에도 아웃바운드를 유지하려면 (NAT 비용 2배)
+
+# (2) 이미 있는 VPC 를 쓴다
+# vpc_id             = "vpc-xxxxxxxx"
+# private_subnet_ids = ["subnet-aaaaaaaa", "subnet-bbbbbbbb"] # 서로 다른 AZ, NAT 등 나가는 길 필요
+# alb_subnet_ids     = ["subnet-cccccccc", "subnet-dddddddd"]
+
+# ── 호스트 ──
+instance_type = "t3.medium"
+min_size      = 2
+max_size      = 4
+
+# certificate_arn      = "arn:aws:acm:ap-northeast-2:123456789012:certificate/..."
+# db_security_group_id = "sg-xxxxxxxx" # DB EC2 의 보안 그룹 (같은 VPC 이거나 피어링돼 있어야 한다)

@@ -1,0 +1,52 @@
+# ECS 배포 타깃. Makefile.infra 가 끌어 쓴다. 상세는 deploy/README.md
+-include deploy/ecs/deploy.env
+export AWS_REGION ECS_CLUSTER ECS_SERVICE
+
+# 지연 확장(=) — aws 를 안 쓰는 타깃에서는 STS 를 부르지 않는다
+ECR_REGISTRY = $(shell aws sts get-caller-identity --query Account --output text).dkr.ecr.$(AWS_REGION).amazonaws.com
+IMAGE        = $(ECR_REGISTRY)/$(ECS_SERVICE)
+
+TF          := terraform -chdir=deploy/terraform/service
+TF_PLATFORM := terraform -chdir=deploy/terraform/platform
+TF_VARS      = -var region=$(AWS_REGION) -var platform=$(ECS_CLUSTER) -var name=$(ECS_SERVICE)
+TF_ARGS     ?=
+RELEASE     ?=
+
+.PHONY: ecr-login tf-init tf-plan tf-apply platform-plan platform-apply releases deploy ecs-status ecs-logs
+
+ecr-login:        ## image-push 전에 한 번
+	aws ecr get-login-password | docker login --username AWS --password-stdin $(ECR_REGISTRY)
+
+tf-init:
+	$(TF) init
+
+tf-plan:          ## 서비스 인프라 변경 미리 보기
+	$(TF) plan $(TF_VARS) $(TF_ARGS)
+
+tf-apply:
+	$(TF) apply $(TF_VARS) $(TF_ARGS)
+
+platform-plan:    ## 클러스터·ALB — 플랫폼을 이 저장소가 소유할 때만
+	$(TF_PLATFORM) init -input=false
+	$(TF_PLATFORM) plan -var region=$(AWS_REGION) -var name=$(ECS_CLUSTER) $(TF_ARGS)
+
+platform-apply:
+	$(TF_PLATFORM) init -input=false
+	$(TF_PLATFORM) apply -var region=$(AWS_REGION) -var name=$(ECS_CLUSTER) $(TF_ARGS)
+
+releases:         ## ECR 에 있는 태그, 최근 것부터
+	@aws ecr describe-images --repository-name $(ECS_SERVICE) \
+		--query 'reverse(sort_by(imageDetails[?imageTags], &imagePushedAt))[:15].[imagePushedAt, join(`, `, imageTags)]' --output text
+
+deploy:           ## 있는 이미지를 굴린다 — 롤백: make deploy RELEASE=<태그>
+	./deploy/ecs/deploy.sh $(RELEASE)
+
+ecs-status:       ## 태스크가 어느 호스트·AZ 에 떠 있는지
+	@aws ecs describe-services --cluster $(ECS_CLUSTER) --services $(ECS_SERVICE) \
+		--query 'services[0].{desired:desiredCount,running:runningCount,taskDefinition:taskDefinition,events:events[:5].message}'
+	@aws ecs list-tasks --cluster $(ECS_CLUSTER) --service-name $(ECS_SERVICE) --query taskArns --output text \
+		| xargs -r aws ecs describe-tasks --cluster $(ECS_CLUSTER) --tasks \
+			--query 'tasks[].{task:taskArn,az:availabilityZone,host:containerInstanceArn,status:lastStatus,health:healthStatus}' --output table
+
+ecs-logs:
+	aws logs tail /ecs/$(ECS_SERVICE) --follow --since 10m

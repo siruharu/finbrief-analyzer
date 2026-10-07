@@ -1,0 +1,95 @@
+name: Release
+
+# main 에 push/merge 되면: 이미지 빌드 → ECR 푸시 → ECS 롤링 배포 (무중단).
+# 수동 실행에 tag 를 주면 빌드 없이 그 이미지를 다시 굴린다 — 롤백.
+#
+# Gitea Actions 와 GitHub Actions 양쪽에서 돈다 (Gitea 는 .gitea/workflows 가 없으면
+# .github/workflows 를 읽는다). 러너에 docker 와 jq 가 있어야 한다.
+#
+# AWS 자격증명 — 장기 키를 CI 에 두지 않는 쪽을 권한다:
+#   · 러너를 EC2 에 두고 인스턴스 역할을 쓴다 (시크릿 불필요). terraform 의 ci_role_name
+#   · 안 되면 저장소 시크릿 AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
+# Gitea Actions 는 아직 OIDC 토큰(id-token)을 발급하지 않아 OIDC 역할 위임은 쓸 수 없다.
+# 어느 쪽이든 필요한 권한은 terraform 출력 deploy_policy_arn 하나다.
+on:
+  push:
+    branches: [main]
+    # 문서·인프라 정의만 바뀐 커밋은 배포하지 않는다
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - "deploy/terraform/**"
+      - ".claude/**"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "다시 굴릴 이미지 태그 (비우면 지금 커밋을 빌드해 배포)"
+        required: false
+
+# 배포 두 개가 겹쳐 굴러가지 않게 한다
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  # ECS 호스트의 아키텍처와 맞춘다. Graviton 이면 linux/arm64
+  PLATFORMS: linux/amd64
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1 · Checkout source
+        uses: actions/checkout@v7
+
+      - name: 버전 · 배포 대상
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          # 날짜만으로는 하루에 두 번 배포할 때 겹친다 — 커밋을 붙인다
+          version="${INPUT_TAG:-$(date -u +%Y%m%d)-${GITHUB_SHA::7}}"
+          [[ "$version" =~ ^[0-9A-Za-z][0-9A-Za-z._-]*$ ]] || { echo "이상한 태그: $version"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "REBUILD=$([[ -z "$INPUT_TAG" ]] && echo true || echo false)" >> "$GITHUB_ENV"
+          grep -E '^[A-Z_]+=' deploy/ecs/deploy.env | tr -d '\r' >> "$GITHUB_ENV"
+
+      - name: aws cli
+        run: |
+          set -euo pipefail
+          command -v aws >/dev/null && exit 0
+          curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscli.zip
+          unzip -q /tmp/awscli.zip -d /tmp
+          /tmp/aws/install
+
+      - name: 2 · Login to Amazon ECR
+        run: |
+          set -euo pipefail
+          account="$(aws sts get-caller-identity --query Account --output text)"
+          registry="$account.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+          echo "ECR_REGISTRY=$registry" >> "$GITHUB_ENV"
+
+      - name: 3 · Build and push Docker image
+        if: env.REBUILD == 'true'
+        run: |
+          set -euo pipefail
+          image="$ECR_REGISTRY/$ECS_SERVICE"
+          docker buildx create --name release --use >/dev/null 2>&1 || docker buildx use release
+          # latest 는 "가장 최근 빌드" 표시일 뿐이다. 배포는 항상 날짜 태그로 한다.
+          docker buildx build . \
+            --platform "$PLATFORMS" \
+            --build-arg "VERSION=$VERSION" \
+            --tag "$image:$VERSION" \
+            --tag "$image:latest" \
+            --cache-from "type=registry,ref=$image:buildcache" \
+            --cache-to "type=registry,ref=$image:buildcache,mode=max,image-manifest=true,oci-mediatypes=true" \
+            --push
+
+      # 최신 태스크 정의에서 이미지 한 줄만 바꿔 새 리비전으로 등록하고(render),
+      # 서비스를 갈아 끼운 뒤(deploy) 새 태스크가 실제로 트래픽을 받는지까지 본다.
+      # 새 버전이 못 떠서 ECS 가 되돌린 경우 여기서 실패한다.
+      - name: 4 · Render ECS task definition  5 · Deploy ECS service
+        run: ./deploy/ecs/deploy.sh "$VERSION"

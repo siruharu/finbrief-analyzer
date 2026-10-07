@@ -1,0 +1,8 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+# 계정별 값. 예시는 terraform.tfvars.example
+terraform.tfvars
+*.auto.tfvars

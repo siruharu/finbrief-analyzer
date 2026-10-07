@@ -1,0 +1,78 @@
+# 로컬 개발용 의존 서비스. 앱 자체는 호스트에서 돌린다 (리로드가 빠르다).
+# 프로파일로 필요한 것만 띄운다:
+#   make up                 # PROFILES=db  (기본)
+#   make up PROFILES=db,mq
+#   make up PROFILES=all
+name: finbrief-analyzer
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    profiles: [db, all]
+    environment:
+      POSTGRES_USER: finbrief_analyzer
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: finbrief_analyzer
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finbrief_analyzer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    profiles: [cache, all]
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["6379:6379"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    profiles: [mq, all]
+    environment:
+      RABBITMQ_DEFAULT_USER: finbrief_analyzer
+      RABBITMQ_DEFAULT_PASS: localdev
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # 관리 UI — http://localhost:15672
+    volumes:
+      - mqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    profiles: [mqtt, all]
+    ports:
+      - "1883:1883"
+      - "9001:9001"   # websocket
+    volumes:
+      - ./deploy/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  # 이미지가 실제로 뜨는지 확인할 때만. `make up PROFILES=app`
+  app:
+    profiles: [app]
+    build:
+      context: .
+    ports: ["8000:8000"]
+    environment:
+      APP_NAME: finbrief-analyzer
+    # healthcheck 는 일부러 없다 — 런타임 이미지(distroless/slim)에 셸도 wget 도 없다.
+    # 확인은 호스트에서: curl localhost:8000/health
+
+volumes:
+  pgdata:
+  redisdata:
+  mqdata:

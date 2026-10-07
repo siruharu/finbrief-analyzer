@@ -1,0 +1,21 @@
+# cp terraform.tfvars.example terraform.tfvars 후 채운다 (terraform.tfvars 는 git 제외)
+host_headers = ["finbrief-analyzer.example.com"]
+# route53_zone_id = "Z0123456789ABCDEFGHIJ" # 주면 위 도메인의 레코드를 ALB 로 만든다
+# listener_port   = 80                      # 플랫폼에 인증서가 없을 때
+
+desired_count = 2
+max_count     = 4
+
+# ci_role_name    = "gitea-runner"                                    # 러너 EC2 의 인스턴스 역할
+# alarm_topic_arn = "arn:aws:sns:ap-northeast-2:123456789012:alerts"
+
+# DB 는 별도 EC2 다. 주소는 평문, 비밀번호는 SSM Parameter Store(SecureString) 나 Secrets Manager 로.
+environment = {
+  APP_NAME = "finbrief-analyzer"
+  # APP_DB_HOST = "db.internal.example.com"
+  # APP_DB_PORT = "5432"
+}
+
+secrets = {
+  # APP_DB_PASSWORD = "arn:aws:ssm:ap-northeast-2:123456789012:parameter/finbrief-analyzer/db-password"
+}

@@ -1,0 +1,49 @@
+[project]
+name = "finbrief-analyzer"
+version = "0.1.0"
+description = "시세·뉴스를 수집·분석해 일일 금융 브리핑을 만드는 엔진"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic-settings",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "httpx",
+    "ruff",
+    "mypy",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/finbrief_analyzer"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+# 하네스는 4개 언어 템플릿이 공유한다. 파이썬 프로젝트에서만 린트되면
+# 언어마다 기준이 갈리므로 제외하고, 점검은 `harness.py doctor` 로 한다.
+extend-exclude = [".claude"]
+
+[tool.ruff.lint]
+# E,F: pyflakes/pycodestyle | I: import 정렬 | B: bugbear | UP: 최신 문법 | SIM: 단순화
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --cov=finbrief_analyzer --cov-report=term-missing"

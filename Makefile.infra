@@ -1,0 +1,41 @@
+# 인프라 공통 타깃. 언어별 Makefile 에서 `-include Makefile.infra` 로 끌어 쓴다.
+comma    := ,
+empty    :=
+space    := $(empty) $(empty)
+PROFILES ?= db
+# 지연 확장(=) 이어야 `make up PROFILES=db,mq` 가 먹는다
+COMPOSE   = docker compose $(foreach p,$(subst $(comma),$(space),$(PROFILES)),--profile $(p))
+TAG      ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+
+.PHONY: up down logs ps nuke psql redis-cli image image-push
+
+up:               ## 의존 서비스 기동 (PROFILES=db,mq,cache,mqtt,app,all)
+	$(COMPOSE) up -d
+	@$(COMPOSE) ps
+
+down:
+	$(COMPOSE) down
+
+logs:
+	$(COMPOSE) logs -f --tail=100
+
+ps:
+	docker compose ps
+
+nuke:             ## 볼륨까지 삭제 — 데이터 날아감
+	docker compose --profile all down -v
+
+psql:
+	docker compose exec postgres psql -U finbrief_analyzer -d finbrief_analyzer
+
+redis-cli:
+	docker compose exec redis redis-cli
+
+image:            ## 로컬 이미지 빌드
+	docker build -t $(IMAGE):$(TAG) .
+
+image-push: image
+	docker push $(IMAGE):$(TAG)
+
+# 배포 대상별 타깃과 IMAGE 정의 (INFRA=ecs|k8s 에 따라 내용이 다르다)
+-include Makefile.deploy
