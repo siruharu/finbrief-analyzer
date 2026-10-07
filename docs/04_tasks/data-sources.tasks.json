@@ -24,13 +24,13 @@
     {
       "id": 3,
       "title": "설정과 의존성 (버전 고정)",
-      "status": "doing",
+      "status": "done",
       "after": [
         1
       ],
       "verify": "uv run pytest tests/test_config.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "5dee744"
     },
     {
       "id": 4,
