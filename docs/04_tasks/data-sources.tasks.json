@@ -106,7 +106,7 @@
     {
       "id": 10,
       "title": "수집 조립과 휴장 판정",
-      "status": "doing",
+      "status": "done",
       "after": [
         5,
         7,
@@ -114,7 +114,7 @@
       ],
       "verify": "uv run pytest tests/collect/test_service.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "4d3babc"
     },
     {
       "id": 11,
