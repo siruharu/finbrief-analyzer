@@ -47,7 +47,7 @@
     {
       "id": 5,
       "title": "yfinance 예비 어댑터와 폴백 합성",
-      "status": "todo",
+      "status": "doing",
       "after": [
         4
       ],
