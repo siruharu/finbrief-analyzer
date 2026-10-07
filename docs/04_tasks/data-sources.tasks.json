@@ -13,7 +13,7 @@
     {
       "id": 2,
       "title": "도메인 모델과 제공자 인터페이스",
-      "status": "todo",
+      "status": "doing",
       "after": [
         1
       ],
