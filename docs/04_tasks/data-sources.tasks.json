@@ -141,13 +141,13 @@
     {
       "id": 13,
       "title": "시세 표시 이름·시장·등락폭을 스냅샷에 싣기",
-      "status": "doing",
+      "status": "done",
       "after": [
         10
       ],
       "verify": "uv run pytest tests/collect && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "b9599a0"
     }
   ]
 }
