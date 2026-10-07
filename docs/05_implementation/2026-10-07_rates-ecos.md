@@ -5,7 +5,7 @@ topic: data-sources
 created: 2026-10-07
 status: done
 source_task: "[[2026-10-07_data-sources]]"
-commits: []
+commits: [84a9ddc]
 blog_candidate: true
 tags: [implementation]
 ---

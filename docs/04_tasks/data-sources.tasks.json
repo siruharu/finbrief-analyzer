@@ -58,14 +58,14 @@
     {
       "id": 6,
       "title": "금리 어댑터 (PoC 결과에 따라 조건부)",
-      "status": "doing",
+      "status": "done",
       "after": [
         2,
         3
       ],
       "verify": "uv run pytest tests/collect/test_rates.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "84a9ddc"
     },
     {
       "id": 7,
