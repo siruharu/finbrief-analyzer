@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" version="2.0">
+  <channel>
+    <title>매일경제 : 경제</title>
+    <link>https://www.mk.co.kr/news/economy/</link>
+    <item>
+      <no>12170565</no>
+      <title><![CDATA[[단독] 정부 산란계 줄여놓고 ‘외국산 수입’ 땜질 논란]]></title>
+      <link>https://www.mk.co.kr/news/economy/12170565</link>
+      <category>경제</category>
+      <author><![CDATA[이영희]]></author>
+      <pubDate>Wed, 07 Oct 2026 16:27:31 +09:00</pubDate>
+      <description><![CDATA[고병원성AI에 닭 살처분했는데 방역 인프라 사업 집행액은 줄여 내년 사육면적 규제로 생산 부담..]]></description>
+      <media:content url="https://example.com/a.jpg" />
+    </item>
+    <item>
+      <no>12170546</no>
+      <title><![CDATA[금감원 &amp; 증권사 간담회]]></title>
+      <link>https://www.mk.co.kr/news/stock/12170546</link>
+      <pubDate>Wed, 07 Oct 2026 16:14:15 +09:00</pubDate>
+      <description><![CDATA[<p>금감원-증권사&nbsp;21곳 <b>내부감사</b> 간담회</p>
+        해킹 관련 IT보안 &lt;전면&gt; 재점검도 강조]]></description>
+    </item>
+    <item>
+      <title><![CDATA[한경에도 실린 기사]]></title>
+      <link>https://www.hankyung.com/article/202610078712i</link>
+      <pubDate>Wed, 07 Oct 2026 16:00:00 +09:00</pubDate>
+      <description><![CDATA[다른 피드에서 온 같은 링크]]></description>
+    </item>
+    <item>
+      <title><![CDATA[발행 시각이 없는 기사]]></title>
+      <link>https://www.mk.co.kr/news/economy/1</link>
+    </item>
+    <item>
+      <title><![CDATA[시각을 읽을 수 없는 기사]]></title>
+      <link>https://www.mk.co.kr/news/economy/2</link>
+      <pubDate>어제 오후</pubDate>
+    </item>
+    <item>
+      <title><![CDATA[링크가 웹 주소가 아닌 기사]]></title>
+      <link>javascript:alert(1)</link>
+      <pubDate>Wed, 07 Oct 2026 16:00:00 +09:00</pubDate>
+    </item>
+    <item>
+      <title></title>
+      <link>https://www.mk.co.kr/news/economy/3</link>
+      <pubDate>Wed, 07 Oct 2026 16:00:00 +09:00</pubDate>
+    </item>
+  </channel>
+</rss>

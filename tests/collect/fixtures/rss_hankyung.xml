@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+    <channel>
+        <title><![CDATA[한국경제 | 뉴스 | 경제]]></title>
+        <link>https://www.hankyung.com/economy</link>
+        <item>
+            <title><![CDATA[HD건설기계, 美 데이터센터 발전엔진 '롱블록' 수주…3900억 규모]]></title>
+            <link><![CDATA[https://www.hankyung.com/article/202610078712i]]></link>
+            <author><![CDATA[홍길동]]></author>
+            <pubDate><![CDATA[Wed, 07 Oct 2026 15:58:43 +0900]]></pubDate>
+        </item>
+        <item>
+            <title><![CDATA[은행주 밸류업 2막...'얼마나 잘 버느냐'가 주가 가른다]]></title>
+            <link><![CDATA[https://www.hankyung.com/article/202610078173i]]></link>
+            <author><![CDATA[김철수]]></author>
+            <pubDate><![CDATA[Wed, 07 Oct 2026 08:08:15 +0900]]></pubDate>
+        </item>
+        <item>
+            <title><![CDATA[어제 기사]]></title>
+            <link><![CDATA[https://www.hankyung.com/article/202610060001i]]></link>
+            <pubDate><![CDATA[Tue, 06 Oct 2026 17:52:54 +0900]]></pubDate>
+        </item>
+    </channel>
+</rss>
