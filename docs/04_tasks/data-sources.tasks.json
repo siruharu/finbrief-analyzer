@@ -24,7 +24,7 @@
     {
       "id": 3,
       "title": "설정과 의존성 (버전 고정)",
-      "status": "todo",
+      "status": "doing",
       "after": [
         1
       ],
