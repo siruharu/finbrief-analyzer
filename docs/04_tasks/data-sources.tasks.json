@@ -58,7 +58,7 @@
     {
       "id": 6,
       "title": "금리 어댑터 (PoC 결과에 따라 조건부)",
-      "status": "todo",
+      "status": "doing",
       "after": [
         2,
         3
