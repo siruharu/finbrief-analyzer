@@ -37,6 +37,13 @@ next: implementation
 - 함수 30줄 이하. 주석·식별자는 영어.
 - `.env` 의 실제 키 값은 읽어서 문서·로그·커밋에 옮기지 않는다. 키 이름만 다룬다.
 
+## PoC 이후 바뀐 것 (2026-10-07 사용자 결정)
+근거는 `docs/01_research/2026-10-07_data-source-poc.md`. 아래 Task 별 메모와 어긋나면 이 절이 우선한다.
+- **Task 2**: 값은 `float`. `Quote` 는 심볼·종가·전일 종가·기준일만 가진다. 금리·환율도 같은 `Quote` 로 싣는다.
+- **Task 3**: 기본 시세 심볼은 `^KS11`, `^KQ11`, `US500`, `IXIC`, `DJI`, `US10YT` (국내 2·미국 3·미 국채 1). **환율은 심볼 목록에서 뺀다.** 의존성에 `defusedxml` 추가.
+- **Task 5**: 국내 지수의 예비는 yfinance 가 아니라 **네이버**(`fchart.stock.naver.com/siseJson.nhn`)다. 미국 지수의 예비는 yfinance 그대로.
+- **Task 6**: 막지 않는다. ECOS 로 기준금리·국고채 3년·10년과 **원/달러 매매기준율**을 가져온다.
+
 ## Task 별 설계 메모
 
 ### Task 1 — PoC: 출처별 심볼·가용성·금리 출처·RSS 구조 확인
