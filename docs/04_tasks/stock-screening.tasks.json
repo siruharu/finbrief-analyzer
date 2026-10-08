@@ -100,6 +100,28 @@
       "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-08_screening-poc.md').read_text(encoding='utf-8');assert 'status: done' in t and '묶음 50' in t\"",
       "note": "",
       "commit": "71a4f14"
+    },
+    {
+      "id": 10,
+      "title": "조건 충족 종목 표현 수정: 52주 신고가만, 거래량 급증은 상승 마감만",
+      "status": "done",
+      "after": [
+        8
+      ],
+      "verify": "uv run pytest tests/screen tests/compose && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": "48a8237"
+    },
+    {
+      "id": 11,
+      "title": "미국 종목 한글 이름",
+      "status": "done",
+      "after": [
+        8
+      ],
+      "verify": "uv run pytest tests/screen tests/compose && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": "48a8237"
     }
   ]
 }
