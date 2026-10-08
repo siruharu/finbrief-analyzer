@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import replace
 from datetime import date
 from typing import Protocol
 
@@ -20,6 +21,8 @@ EXTRA_PAGES = 2
 SHARE_CLASS_TICKERS = {"BRKB": "BRK-B", "BFB": "BF-B"}
 # (symbol, name) pairs of the S&P 500.
 Sp500Fetch = Callable[[], Sequence[tuple[str, str]]]
+# Ticker -> Korean display name.
+NameFetch = Callable[[], Mapping[str, str]]
 
 
 class UniverseSource(Protocol):
@@ -83,13 +86,26 @@ def _fdr_sp500() -> Sequence[tuple[str, str]]:  # pragma: no cover - network
 
 
 class Sp500UniverseSource:
-    def __init__(self, fetch: Sp500Fetch = _fdr_sp500) -> None:
+    def __init__(self, fetch: Sp500Fetch = _fdr_sp500, names: NameFetch | None = None) -> None:
         self._fetch = fetch
+        self._names = names
 
     def members(self, exchange: Exchange, size: int) -> list[Member]:
         # The whole index, not a cut: the listing is alphabetical, so slicing it would
         # drop stocks by name. `size` only serves as the minimum a full answer must reach.
-        return members_from_sp500(self._fetch())
+        found = members_from_sp500(self._fetch())
+        korean = self._korean_names()
+        return [replace(member, name=korean.get(member.symbol, member.name)) for member in found]
+
+    def _korean_names(self) -> Mapping[str, str]:
+        """Display names for the briefing. Without them the English names stay."""
+        if self._names is None:
+            return {}
+        try:
+            return self._names()
+        except CollectError as error:
+            logger.warning("korean names unavailable, keeping english ones: %s", error)
+            return {}
 
 
 def refresh_universe(

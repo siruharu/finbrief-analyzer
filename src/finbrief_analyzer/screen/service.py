@@ -29,6 +29,7 @@ from finbrief_analyzer.screen.universe import (
     UniverseSource,
     refresh_universe,
 )
+from finbrief_analyzer.screen.us_names import NaverUsNames
 from finbrief_analyzer.store.price_bars import histories
 from finbrief_analyzer.store.universe import members
 
@@ -83,7 +84,7 @@ def build_screen_deps(settings: Settings, engine: Engine, client: httpx.Client) 
     universe: dict[Exchange, UniverseSource] = {
         Exchange.KOSPI: korean,
         Exchange.KOSDAQ: korean,
-        Exchange.SP500: Sp500UniverseSource(),
+        Exchange.SP500: Sp500UniverseSource(names=NaverUsNames(client).fetch),
     }
     return ScreenDeps(engine, HistorySources(ranking, FdrHistorySource(), batch), universe)
 

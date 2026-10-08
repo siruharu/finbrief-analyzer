@@ -231,3 +231,32 @@ def test_sp500_source_returns_the_whole_index_not_an_alphabetical_cut() -> None:
 
     # then
     assert [member.symbol for member in found] == ["AAPL", "NVDA", "ZTS"]
+
+
+LISTING = [("NVDA", "Nvidia"), ("MDT", "Medtronic")]
+
+
+def test_sp500_members_take_the_korean_name_when_there_is_one() -> None:
+    # given: a Korean name for one of the two
+    source = Sp500UniverseSource(lambda: LISTING, names=lambda: {"NVDA": "엔비디아"})
+
+    # when
+    found = source.members(Exchange.SP500, 1)
+
+    # then: the other keeps its English name
+    assert [(member.symbol, member.name) for member in found] == [
+        ("NVDA", "엔비디아"),
+        ("MDT", "Medtronic"),
+    ]
+
+
+def test_sp500_members_keep_english_names_when_the_name_source_fails() -> None:
+    # given
+    def broken() -> dict[str, str]:
+        raise CollectError("naver-us-names", "NASDAQ page 1: HTTPStatusError")
+
+    # when
+    found = Sp500UniverseSource(lambda: LISTING, names=broken).members(Exchange.SP500, 1)
+
+    # then: a missing display name must not cost the universe
+    assert [member.name for member in found] == ["Nvidia", "Medtronic"]
