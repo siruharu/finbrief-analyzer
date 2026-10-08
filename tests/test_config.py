@@ -120,3 +120,35 @@ def test_marketaux_calls_per_slot_stay_within_the_free_daily_quota() -> None:
 
     # then
     assert 0 < settings.marketaux_max_calls_per_slot * 2 <= 100
+
+
+def test_default_watchlist_is_ten_kr_and_ten_us_stocks_apart_from_the_indices() -> None:
+    # given / when
+    settings = Settings()
+
+    # then
+    markets = [s.market for s in settings.watchlist]
+    assert markets.count(Market.KR_STOCK) == 10
+    assert markets.count(Market.US_STOCK) == 10
+    symbols = [s.symbol for s in settings.watchlist]
+    assert len(set(symbols)) == 20
+    assert not set(symbols) & {s.symbol for s in settings.quote_symbols}
+
+
+def test_watchlist_can_be_emptied(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
+    monkeypatch.setenv("APP_WATCHLIST", "[]")
+
+    # when / then
+    assert Settings().watchlist == ()
+
+
+def test_all_symbols_lists_the_indices_first_and_the_watchlist_after() -> None:
+    # given
+    settings = Settings()
+
+    # when
+    symbols = settings.all_symbols()
+
+    # then: one list, so everything is collected in a single request batch
+    assert symbols == (*settings.quote_symbols, *settings.watchlist)

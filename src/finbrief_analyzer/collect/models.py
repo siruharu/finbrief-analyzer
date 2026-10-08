@@ -21,6 +21,10 @@ class Market(StrEnum):
     RATE = "rate"
     # Commodity futures and crypto: traded around the clock, so the value is a live one.
     COMMODITY = "commodity"
+    # Individual stocks on the watchlist. Kept apart from KR/US so that one suspended
+    # stock is never read as "the market was closed".
+    KR_STOCK = "kr_stock"
+    US_STOCK = "us_stock"
 
 
 class CollectError(Exception):

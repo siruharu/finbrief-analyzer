@@ -83,7 +83,7 @@ def open_deps(settings: Settings) -> Iterator[JobDeps]:
     try:
         yield JobDeps(
             collect=lambda slot, now: collect_snapshot(
-                slot, now, providers, settings.quote_symbols
+                slot, now, providers, settings.all_symbols()
             ),
             recipients=recipients,
             notifier=notifier,

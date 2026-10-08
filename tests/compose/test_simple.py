@@ -229,3 +229,50 @@ def test_news_is_capped_keeping_the_newest_items() -> None:
     # then
     assert len(links) == MAX_NEWS_ITEMS
     assert links[0].title == "기사 0"
+
+
+SAMSUNG = Quote(
+    "005930", 266750.0, AS_OF, prev_close=268500.0, name="삼성전자", market=Market.KR_STOCK
+)
+NVIDIA = Quote("NVDA", 235.12, AS_OF, prev_close=231.0, name="엔비디아", market=Market.US_STOCK)
+
+
+def test_watchlist_stocks_get_one_group_per_country() -> None:
+    # given
+    snapshot = _snapshot(quotes=(SP500, SAMSUNG, NVIDIA))
+
+    # when
+    briefing = compose_simple(snapshot, DAY)
+
+    # then
+    assert _section(briefing, "국내 관심 종목").lines == ("삼성전자 266,750 (-0.65%)",)
+    assert _section(briefing, "미국 관심 종목").lines == ("엔비디아 235.12 (+1.78%)",)
+
+
+def test_watchlist_groups_come_after_every_market_group_in_both_slots() -> None:
+    # given
+    quotes = (*EVERY_MARKET, SAMSUNG, NVIDIA)
+
+    # when
+    kr = _quote_titles(compose_simple(_snapshot(quotes=quotes, slot=Slot.KR_OPEN), DAY))
+    us = _quote_titles(compose_simple(_snapshot(quotes=quotes, slot=Slot.US_OPEN), DAY))
+
+    # then
+    assert kr[-2:] == ["국내 관심 종목", "미국 관심 종목"]
+    assert us[-2:] == ["국내 관심 종목", "미국 관심 종목"]
+
+
+def test_korean_stock_price_is_shown_without_decimals() -> None:
+    # given: won prices are whole numbers
+    lonely = Quote("000660", 1750000.0, AS_OF, name="SK하이닉스", market=Market.KR_STOCK)
+
+    # when / then
+    assert _lines(_snapshot(quotes=(lonely,))) == ("SK하이닉스 1,750,000",)
+
+
+def test_watchlist_alone_still_makes_a_sendable_briefing() -> None:
+    # given: every index failed, the watchlist came in
+    briefing = compose_simple(_snapshot(quotes=(SAMSUNG,)), DAY)
+
+    # when / then
+    assert briefing.is_sendable is True

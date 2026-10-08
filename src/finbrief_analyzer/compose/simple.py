@@ -16,10 +16,12 @@ GROUP_TITLES: dict[Market | None, str] = {
     Market.RATE: "금리",
     Market.FX: "환율",
     Market.COMMODITY: "원자재·코인",
+    Market.KR_STOCK: "국내 관심 종목",
+    Market.US_STOCK: "미국 관심 종목",
     # A quote whose symbol is not in the configured list carries no market.
     None: "기타",
 }
-_TAIL = (Market.RATE, Market.FX, Market.COMMODITY, None)
+_TAIL = (Market.RATE, Market.FX, Market.COMMODITY, Market.KR_STOCK, Market.US_STOCK, None)
 # Each briefing leads with the market that closed just before it.
 GROUP_ORDER: dict[Slot, tuple[Market | None, ...]] = {
     Slot.KR_OPEN: (Market.US, Market.KR, Market.ASIA, *_TAIL),
@@ -59,14 +61,20 @@ def _quote_line(quote: Quote) -> str:
         # A yield moving 3.933 -> 3.961 is +2.8bp; as a percentage it would read +0.71%.
         change = "" if quote.change_bp is None else f" ({quote.change_bp:+.1f}bp)"
         return f"{name} {quote.close:.3f}%{change}"
-    # A value around 1 (EUR/USD) would lose its movement at two decimals.
-    digits = 4 if abs(quote.close) < 10 else 2
+    digits = _digits(quote)
     value = f"{name} {quote.close:,.{digits}f}"
     if quote.change is None or quote.change_pct is None:
         return value
     if quote.market is Market.FX:
         return f"{value} ({quote.change:+,.{digits}f}, {quote.change_pct:+.2f}%)"
     return f"{value} ({quote.change_pct:+.2f}%)"
+
+
+def _digits(quote: Quote) -> int:
+    if quote.market is Market.KR_STOCK:
+        return 0  # won prices are whole numbers
+    # A value around 1 (EUR/USD) would lose its movement at two decimals.
+    return 4 if abs(quote.close) < 10 else 2
 
 
 def _news_section(items: Sequence[NewsItem]) -> Section:

@@ -427,3 +427,52 @@ def test_scale_is_applied_to_the_close_and_the_previous_close() -> None:
     assert quote.close == pytest.approx(845.4)
     assert quote.prev_close == pytest.approx(846.3)
     assert quote.change_pct == pytest.approx((8.454 - 8.463) / 8.463 * 100)
+
+
+WATCHED = (
+    *SYMBOLS,
+    QuoteSymbol(symbol="005930", name="삼성전자", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="NVDA", name="엔비디아", market=Market.US_STOCK),
+)
+
+
+def test_watchlist_stocks_are_collected_in_the_same_request_as_the_indices() -> None:
+    # given
+    as_of = dict.fromkeys([*ALL_SYMBOLS, "005930", "NVDA"], date(2026, 10, 6))
+    quotes = _Quotes(as_of)
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=quotes), WATCHED)
+
+    # then
+    assert quotes.asked == [[*ALL_SYMBOLS, "005930", "NVDA"]]
+    labels = {q.symbol: (q.name, q.market) for q in snapshot.quotes}
+    assert labels["005930"] == ("삼성전자", Market.KR_STOCK)
+    assert labels["NVDA"] == ("엔비디아", Market.US_STOCK)
+
+
+def test_missing_watchlist_stock_is_recorded_and_the_rest_is_kept() -> None:
+    # given: one stock has no data
+    as_of = dict.fromkeys([*ALL_SYMBOLS, "005930"], date(2026, 10, 6))
+
+    # when
+    snapshot = collect_snapshot(
+        Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=_Quotes(as_of)), WATCHED
+    )
+
+    # then
+    assert snapshot.missing == ("NVDA",)
+    assert len(snapshot.quotes) == len(ALL_SYMBOLS) + 1
+
+
+def test_stale_watchlist_stock_does_not_mark_its_market_closed() -> None:
+    # given: a suspended stock whose last row is a week old, while the indices are current
+    as_of = {**dict.fromkeys(ALL_SYMBOLS, date(2026, 10, 6)), "005930": date(2026, 9, 29)}
+
+    # when
+    snapshot = collect_snapshot(
+        Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=_Quotes(as_of)), WATCHED
+    )
+
+    # then
+    assert snapshot.closed_markets == frozenset()

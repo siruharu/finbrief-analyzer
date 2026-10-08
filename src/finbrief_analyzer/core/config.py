@@ -44,6 +44,31 @@ DEFAULT_QUOTE_SYMBOLS = (
     QuoteSymbol(symbol="BTC/USD", name="비트코인", market=Market.COMMODITY),
 )
 
+# Ten largest common stocks per country on 2026-10-08, see
+# docs/01_research/2026-10-08_screening-poc.md. A fixed list: it does not follow the ranking.
+DEFAULT_WATCHLIST = (
+    QuoteSymbol(symbol="005930", name="삼성전자", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="000660", name="SK하이닉스", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="402340", name="SK스퀘어", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="009150", name="삼성전기", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="373220", name="LG에너지솔루션", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="005380", name="현대차", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="105560", name="KB금융", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="207940", name="삼성바이오로직스", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="032830", name="삼성생명", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="028260", name="삼성물산", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="NVDA", name="엔비디아", market=Market.US_STOCK),
+    QuoteSymbol(symbol="AAPL", name="애플", market=Market.US_STOCK),
+    QuoteSymbol(symbol="GOOGL", name="알파벳", market=Market.US_STOCK),
+    QuoteSymbol(symbol="MSFT", name="마이크로소프트", market=Market.US_STOCK),
+    QuoteSymbol(symbol="AMZN", name="아마존", market=Market.US_STOCK),
+    QuoteSymbol(symbol="META", name="메타", market=Market.US_STOCK),
+    QuoteSymbol(symbol="AVGO", name="브로드컴", market=Market.US_STOCK),
+    QuoteSymbol(symbol="TSLA", name="테슬라", market=Market.US_STOCK),
+    QuoteSymbol(symbol="BRK-B", name="버크셔 해서웨이", market=Market.US_STOCK),
+    QuoteSymbol(symbol="LLY", name="일라이 릴리", market=Market.US_STOCK),
+)
+
 DEFAULT_KR_RSS_FEEDS = (
     "https://www.hankyung.com/feed/economy",
     "https://www.hankyung.com/feed/finance",
@@ -69,6 +94,8 @@ class Settings(BaseSettings):
 
     # List-valued variables are JSON arrays in the environment.
     quote_symbols: tuple[QuoteSymbol, ...] = DEFAULT_QUOTE_SYMBOLS
+    # Individual stocks shown under their own headings. An empty array turns them off.
+    watchlist: tuple[QuoteSymbol, ...] = DEFAULT_WATCHLIST
     kr_rss_feeds: tuple[str, ...] = DEFAULT_KR_RSS_FEEDS
 
     # Marketaux free plan: 3 articles per request, 100 requests a day, two slots a day.
@@ -102,6 +129,10 @@ class Settings(BaseSettings):
     @classmethod
     def _blank_key_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    def all_symbols(self) -> tuple[QuoteSymbol, ...]:
+        """Everything to quote: indices first, then the watchlist."""
+        return (*self.quote_symbols, *self.watchlist)
 
     def database_url(self) -> URL:
         """Connection URL built from APP_DB_*. Raises ValueError naming what is missing."""
