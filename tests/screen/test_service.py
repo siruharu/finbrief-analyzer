@@ -51,17 +51,54 @@ FLAT = [100.0] * 53
 PEAKED = [100.0] * 26 + [200.0] + [100.0] * 26
 
 
-def test_stock_at_its_high_ranks_above_one_far_below_it() -> None:
-    # given
+def test_only_a_stock_closing_at_its_52_week_high_meets_the_high_rule() -> None:
+    # given: A closed at its high, B at half of it
     bars = {"A": weekly("A", FLAT), "B": weekly("B", PEAKED)}
 
     # when
     high = by_rule(screen_group(members("A", "B"), bars, KR, top=5, min_value=0), Rule.HIGH_52W)
 
-    # then
-    assert [(hit.symbol, hit.score) for hit in high.hits] == [("A", 1.0), ("B", 0.5)]
+    # then: "near the high" is not reported as a new high
+    assert [hit.symbol for hit in high.hits] == ["A"]
     assert high.as_of == LAST
     assert high.exchanges == KR
+
+
+def test_new_highs_are_ordered_by_the_move_of_the_day() -> None:
+    # given: both closed at a new high; B rose more
+    a, b = weekly("A", FLAT), weekly("B", FLAT)
+    a[-1], b[-1] = Bar("A", LAST, 101.0, 1000), Bar("B", LAST, 109.0, 1000)
+
+    # when
+    high = by_rule(
+        screen_group(members("A", "B"), {"A": a, "B": b}, KR, top=5, min_value=0), Rule.HIGH_52W
+    )
+
+    # then
+    assert [hit.symbol for hit in high.hits] == ["B", "A"]
+
+
+def test_result_says_how_many_stocks_met_the_rule_before_the_cut() -> None:
+    # given: seven stocks at their high, room for three
+    bars = {symbol: weekly(symbol, FLAT) for symbol in "ABCDEFG"}
+
+    # when
+    high = by_rule(screen_group(members(*"ABCDEFG"), bars, KR, top=3, min_value=0), Rule.HIGH_52W)
+
+    # then
+    assert (len(high.hits), high.matched) == (3, 7)
+
+
+def test_volume_spike_on_a_falling_day_does_not_meet_the_volume_rule() -> None:
+    # given: A fell 10% and B rose 10%, both on five times the usual volume
+    a, b = weekly("A", FLAT), weekly("B", FLAT)
+    a[-1], b[-1] = Bar("A", LAST, 90.0, 5000), Bar("B", LAST, 110.0, 5000)
+
+    # when
+    results = screen_group(members("A", "B"), {"A": a, "B": b}, KR, top=5, min_value=0)
+
+    # then
+    assert [hit.symbol for hit in by_rule(results, Rule.VOLUME_SPIKE).hits] == ["B"]
 
 
 def test_hit_carries_the_name_the_close_and_the_move_of_the_day() -> None:
@@ -81,9 +118,16 @@ def test_hit_carries_the_name_the_close_and_the_move_of_the_day() -> None:
     assert hit.score == pytest.approx(5.0)
 
 
+def _rising(symbol: str, end: date = LAST) -> list[Bar]:
+    """At a new high on a rising day with double volume: meets both rules."""
+    history = weekly(symbol, FLAT, end=end)
+    history[-1] = Bar(symbol, end, 105.0, 2000)
+    return history
+
+
 def test_only_the_top_n_are_kept() -> None:
     # given
-    bars = {symbol: weekly(symbol, FLAT) for symbol in "ABCDEFG"}
+    bars = {symbol: _rising(symbol) for symbol in "ABCDEFG"}
 
     # when
     results = screen_group(members(*"ABCDEFG"), bars, KR, top=3, min_value=0)
@@ -105,10 +149,7 @@ def test_stock_trading_too_little_is_left_out() -> None:
 
 def test_stock_whose_history_stops_before_the_latest_day_is_left_out() -> None:
     # given: B was suspended a week ago; its "last day" is not today
-    bars = {
-        "A": weekly("A", FLAT),
-        "B": weekly("B", FLAT, last_volume=99_000, end=LAST - timedelta(days=7)),
-    }
+    bars = {"A": _rising("A"), "B": _rising("B", end=LAST - timedelta(days=7))}
 
     # when
     results = screen_group(members("A", "B"), bars, KR, top=5, min_value=0)
@@ -119,7 +160,7 @@ def test_stock_whose_history_stops_before_the_latest_day_is_left_out() -> None:
 
 def test_member_without_history_is_left_out() -> None:
     # given / when
-    results = screen_group(members("A", "B"), {"A": weekly("A", FLAT)}, KR, top=5, min_value=0)
+    results = screen_group(members("A", "B"), {"A": _rising("A")}, KR, top=5, min_value=0)
 
     # then
     assert all([hit.symbol for hit in result.hits] == ["A"] for result in results)
@@ -182,7 +223,7 @@ def test_service_screens_the_stored_history_of_the_universe(store: Engine) -> No
     # then: nothing had to be fetched, and both rules report the Korean group
     assert history.asked == []
     assert {result.rule for result in results} == {Rule.HIGH_52W, Rule.VOLUME_SPIKE}
-    assert [hit.symbol for hit in by_rule(results, Rule.HIGH_52W).hits] == ["A", "B"]
+    assert [hit.symbol for hit in by_rule(results, Rule.HIGH_52W).hits] == ["A"]
     assert all(result.exchanges == KR for result in results)
 
 

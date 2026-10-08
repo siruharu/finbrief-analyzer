@@ -32,11 +32,7 @@ GROUP_ORDER: dict[Slot, tuple[Market | None, ...]] = {
 
 # The list is what a rule produced, not advice. The words 추천, 매수 and 유망 stay out of it.
 SCREEN_TITLE = "조건 충족 종목"
-RULE_TITLES = {Rule.HIGH_52W: "52주 신고가 근접", Rule.VOLUME_SPIKE: "거래량 급증"}
-RULE_NOTES = {
-    Rule.HIGH_52W: "종가가 최근 52주 최고 종가에 가까운 순",
-    Rule.VOLUME_SPIKE: "거래량이 직전 20일 평균의 몇 배인지",
-}
+RULE_TITLES = {Rule.HIGH_52W: "52주 신고가", Rule.VOLUME_SPIKE: "거래량 급증 (상승 마감)"}
 DISCLAIMER = (
     "조건 충족 종목은 정해진 규칙에 따라 자동으로 뽑은 목록입니다. 매수·매도를 권하는 것이 "
     "아니며, 이 규칙이 수익으로 이어지는지는 과거 자료로 검증하지 않았습니다. "
@@ -61,13 +57,21 @@ def _screen_sections(results: Sequence[ScreenResult]) -> tuple[Section, ...]:
         Section(
             title=f"{SCREEN_TITLE} — {_country(result)} {RULE_TITLES[result.rule]}",
             lines=(
-                f"{RULE_NOTES[result.rule]} ({result.as_of.isoformat()} 종가 기준)",
+                f"{_rule_note(result)} ({result.as_of.isoformat()} 종가 기준)",
                 *(_hit_line(hit, result) for hit in result.hits),
             ),
         )
         for result in results
         if result.hits
     )
+
+
+def _rule_note(result: ScreenResult) -> str:
+    if result.rule is Rule.HIGH_52W:
+        # The count keeps the few names shown from reading as "the only ones".
+        count = max(result.matched, len(result.hits))
+        return f"종가가 최근 52주 최고 종가를 새로 쓴 {count}개 종목 중 상승률 순"
+    return "상승 마감한 종목 중 거래량이 직전 20일 평균의 몇 배인지"
 
 
 def _country(result: ScreenResult) -> str:
@@ -77,11 +81,9 @@ def _country(result: ScreenResult) -> str:
 def _hit_line(hit: ScreenHit, result: ScreenResult) -> str:
     digits = 2 if Exchange.SP500 in result.exchanges else 0  # won prices are whole numbers
     move = "" if hit.change_pct is None else f" ({hit.change_pct:+.2f}%)"
-    if result.rule is Rule.HIGH_52W:
-        detail = f"고가 대비 {hit.score * 100:.1f}%"
-    else:
-        detail = f"평소의 {hit.score:.1f}배"
-    return f"{hit.name} {hit.close:,.{digits}f}{move} · {detail}"
+    line = f"{hit.name} {hit.close:,.{digits}f}{move}"
+    # Every new high sits at 100% of its high, so there is nothing more to say about it.
+    return line if result.rule is Rule.HIGH_52W else f"{line} · 평소의 {hit.score:.1f}배"
 
 
 def _quote_sections(snapshot: MarketSnapshot) -> tuple[Section, ...]:

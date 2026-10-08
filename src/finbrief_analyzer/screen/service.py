@@ -4,7 +4,7 @@ import logging
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import httpx
 from sqlalchemy import Engine
@@ -36,9 +36,31 @@ logger = logging.getLogger(__name__)
 
 KR_GROUP = (Exchange.KOSPI, Exchange.KOSDAQ)
 US_GROUP = (Exchange.SP500,)
-RULES: tuple[tuple[Rule, Callable[[Sequence[Bar]], float | None]], ...] = (
-    (Rule.HIGH_52W, high_ratio),
-    (Rule.VOLUME_SPIKE, volume_ratio),
+# Float slack for "closed exactly at the 52-week high".
+NEW_HIGH = 1.0 - 1e-9
+
+
+def _is_new_high(score: Score) -> bool:
+    # At the high, not near it: a stock at 98% of its high has not made a new high.
+    return score.score >= NEW_HIGH
+
+
+def _closed_up(score: Score) -> bool:
+    # Heavy volume on a falling day is a different event; it is not reported here.
+    return score.change_pct is not None and score.change_pct > 0
+
+
+@dataclass(frozen=True, slots=True)
+class RuleSpec:
+    rule: Rule
+    score: Callable[[Sequence[Bar]], float | None]
+    # Which scored stocks count as meeting the rule.
+    meets: Callable[[Score], bool]
+
+
+RULES = (
+    RuleSpec(Rule.HIGH_52W, high_ratio, _is_new_high),
+    RuleSpec(Rule.VOLUME_SPIKE, volume_ratio, _closed_up),
 )
 
 
@@ -85,10 +107,7 @@ def screen_group(
         for symbol, history in bars.items()
         if symbol in names and history and history[-1].day == as_of and _liquid(history, min_value)
     }
-    return [
-        ScreenResult(rule, exchanges, as_of, _hits(current, names, score, top))
-        for rule, score in RULES
-    ]
+    return [_apply(spec, current, names, exchanges, as_of, top) for spec in RULES]
 
 
 def _liquid(history: Sequence[Bar], min_value: float) -> bool:
@@ -96,21 +115,25 @@ def _liquid(history: Sequence[Bar], min_value: float) -> bool:
     return value is not None and value >= min_value
 
 
-def _hits(
+def _apply(
+    spec: RuleSpec,
     current: Mapping[str, Sequence[Bar]],
     names: Mapping[str, str],
-    score: Callable[[Sequence[Bar]], float | None],
+    exchanges: tuple[Exchange, ...],
+    as_of: date,
     top: int,
-) -> tuple[ScreenHit, ...]:
+) -> ScreenResult:
     scores = [
         Score(symbol, value, change_pct(history))
         for symbol, history in current.items()
-        if (value := score(history)) is not None
+        if (value := spec.score(history)) is not None
     ]
-    return tuple(
+    met = [score for score in scores if spec.meets(score)]
+    hits = tuple(
         ScreenHit(s.symbol, names[s.symbol], current[s.symbol][-1].close, s.change_pct, s.score)
-        for s in rank(scores, top)
+        for s in rank(met, top)
     )
+    return ScreenResult(spec.rule, exchanges, as_of, hits, matched=len(met))
 
 
 class ScreenService:

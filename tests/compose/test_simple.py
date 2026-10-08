@@ -284,6 +284,7 @@ HIGH_KR = ScreenResult(
     (Exchange.KOSPI, Exchange.KOSDAQ),
     AS_OF,
     (ScreenHit("096770", "SK이노베이션", 142500.0, 4.21, 1.0),),
+    matched=9,
 )
 VOLUME_US = ScreenResult(
     Rule.VOLUME_SPIKE, (Exchange.SP500,), AS_OF, (ScreenHit("MRNA", "Moderna", 88.4, None, 6.84),)
@@ -301,8 +302,8 @@ def test_screen_result_becomes_a_section_named_after_the_country_and_the_rule() 
 
     # then
     titles = [section.title for section in briefing.sections]
-    assert "조건 충족 종목 — 국내 52주 신고가 근접" in titles
-    assert "조건 충족 종목 — 미국 거래량 급증" in titles
+    assert "조건 충족 종목 — 국내 52주 신고가" in titles
+    assert "조건 충족 종목 — 미국 거래량 급증 (상승 마감)" in titles
 
 
 def test_screen_section_titles_never_call_the_list_a_recommendation() -> None:
@@ -316,25 +317,28 @@ def test_screen_section_titles_never_call_the_list_a_recommendation() -> None:
 
 def test_screen_section_starts_with_the_rule_and_the_day_it_was_measured_on() -> None:
     # given / when
-    section = _section(_screened(HIGH_KR), "조건 충족 종목 — 국내 52주 신고가 근접")
+    section = _section(_screened(HIGH_KR), "조건 충족 종목 — 국내 52주 신고가")
 
-    # then
-    assert section.lines[0] == "종가가 최근 52주 최고 종가에 가까운 순 (2026-10-07 종가 기준)"
+    # then: how many made a new high, so five names are not read as "the only five"
+    assert section.lines[0] == (
+        "종가가 최근 52주 최고 종가를 새로 쓴 9개 종목 중 상승률 순 (2026-10-07 종가 기준)"
+    )
 
 
-def test_high_hit_line_shows_name_close_move_and_distance_from_the_high() -> None:
+def test_high_hit_line_shows_name_close_and_move_without_a_redundant_ratio() -> None:
     # given / when
-    section = _section(_screened(HIGH_KR), "조건 충족 종목 — 국내 52주 신고가 근접")
+    section = _section(_screened(HIGH_KR), "조건 충족 종목 — 국내 52주 신고가")
 
-    # then: a won price has no decimals
-    assert section.lines[1] == "SK이노베이션 142,500 (+4.21%) · 고가 대비 100.0%"
+    # then: a won price has no decimals; every hit is at 100% of its high, so that is not printed
+    assert section.lines[1] == "SK이노베이션 142,500 (+4.21%)"
 
 
 def test_volume_hit_line_shows_the_multiple_and_leaves_out_an_unknown_move() -> None:
     # given / when
-    section = _section(_screened(VOLUME_US), "조건 충족 종목 — 미국 거래량 급증")
+    section = _section(_screened(VOLUME_US), "조건 충족 종목 — 미국 거래량 급증 (상승 마감)")
 
     # then: a dollar price keeps two decimals
+    assert section.lines[0].startswith("상승 마감한 종목 중 거래량이 직전 20일 평균의 몇 배인지")
     assert section.lines[1] == "Moderna 88.40 · 평소의 6.8배"
 
 
@@ -343,7 +347,7 @@ def test_screen_sections_come_after_the_quotes_and_before_the_news() -> None:
     titles = [section.title for section in _screened(HIGH_KR, quotes=(SP500, SAMSUNG)).sections]
 
     # then
-    screen = titles.index("조건 충족 종목 — 국내 52주 신고가 근접")
+    screen = titles.index("조건 충족 종목 — 국내 52주 신고가")
     assert titles.index("국내 관심 종목") < screen < titles.index("뉴스")
 
 

@@ -61,3 +61,5 @@ class ScreenResult:
     exchanges: tuple[Exchange, ...]
     as_of: date
     hits: tuple[ScreenHit, ...]
+    # How many stocks met the rule before the list was cut to the top few.
+    matched: int = 0
