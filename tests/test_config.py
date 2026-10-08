@@ -66,17 +66,28 @@ def test_rss_feeds_have_defaults_and_can_be_overridden(monkeypatch: pytest.Monke
     assert overridden == ("https://example.com/feed.xml",)
 
 
-def test_default_symbols_cover_two_kr_indices_three_us_indices_and_one_us_yield() -> None:
+def test_default_symbols_cover_every_market_group_without_duplicates() -> None:
     # given / when
     symbols = Settings().quote_symbols
 
-    # then: FX is not here, it comes from ECOS (PoC decision)
+    # then: Korean rates and the USD/KRW base rate are not here, they come from ECOS
     by_market = [s.market for s in symbols]
     assert by_market.count(Market.KR) == 2
-    assert by_market.count(Market.US) == 3
+    assert by_market.count(Market.US) == 6
+    assert by_market.count(Market.ASIA) == 3
     assert by_market.count(Market.RATE) == 1
-    assert by_market.count(Market.FX) == 0
+    assert by_market.count(Market.FX) == 4
+    assert by_market.count(Market.COMMODITY) == 4
     assert len({s.symbol for s in symbols}) == len(symbols)
+    assert "USD/KRW" not in {s.symbol for s in symbols}
+
+
+def test_only_the_yen_cross_is_scaled_for_display() -> None:
+    # given / when
+    scaled = {s.symbol: s.scale for s in Settings().quote_symbols if s.scale != 1}
+
+    # then: JPY/KRW is quoted per yen and read per 100 yen
+    assert scaled == {"JPY/KRW": 100}
 
 
 def test_symbols_can_be_overridden_with_a_json_array(monkeypatch: pytest.MonkeyPatch) -> None:

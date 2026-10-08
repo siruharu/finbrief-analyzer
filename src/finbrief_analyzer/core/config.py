@@ -15,16 +15,33 @@ class QuoteSymbol(BaseModel):
     symbol: str
     name: str
     market: Market
+    # Multiplier for display: JPY/KRW is quoted per yen but read per 100 yen.
+    scale: float = 1.0
 
 
-# Confirmed in docs/01_research/2026-10-07_data-source-poc.md. KS11/KQ11 return stale data.
+# Confirmed in docs/01_research/2026-10-07_data-source-poc.md and 2026-10-08_quote-symbols-poc.md.
+# KS11/KQ11 return stale data. Korean rates and the USD/KRW base rate come from ECOS, not here.
 DEFAULT_QUOTE_SYMBOLS = (
     QuoteSymbol(symbol="^KS11", name="KOSPI", market=Market.KR),
     QuoteSymbol(symbol="^KQ11", name="KOSDAQ", market=Market.KR),
     QuoteSymbol(symbol="US500", name="S&P 500", market=Market.US),
     QuoteSymbol(symbol="IXIC", name="나스닥", market=Market.US),
     QuoteSymbol(symbol="DJI", name="다우존스", market=Market.US),
+    QuoteSymbol(symbol="^SOX", name="필라델피아 반도체", market=Market.US),
+    QuoteSymbol(symbol="^RUT", name="러셀 2000", market=Market.US),
+    QuoteSymbol(symbol="^VIX", name="VIX", market=Market.US),
+    QuoteSymbol(symbol="^N225", name="닛케이 225", market=Market.ASIA),
+    QuoteSymbol(symbol="SSEC", name="상하이종합", market=Market.ASIA),
+    QuoteSymbol(symbol="^HSI", name="항셍", market=Market.ASIA),
     QuoteSymbol(symbol="US10YT", name="미 국채 10년", market=Market.RATE),
+    QuoteSymbol(symbol="DX-Y.NYB", name="달러 인덱스", market=Market.FX),
+    QuoteSymbol(symbol="USD/JPY", name="엔/달러", market=Market.FX),
+    QuoteSymbol(symbol="JPY/KRW", name="원/100엔", market=Market.FX, scale=100),
+    QuoteSymbol(symbol="EUR/USD", name="유로/달러", market=Market.FX),
+    QuoteSymbol(symbol="CL=F", name="WTI", market=Market.COMMODITY),
+    QuoteSymbol(symbol="GC=F", name="금", market=Market.COMMODITY),
+    QuoteSymbol(symbol="HG=F", name="구리", market=Market.COMMODITY),
+    QuoteSymbol(symbol="BTC/USD", name="비트코인", market=Market.COMMODITY),
 )
 
 DEFAULT_KR_RSS_FEEDS = (

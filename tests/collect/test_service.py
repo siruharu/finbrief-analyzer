@@ -15,14 +15,24 @@ from finbrief_analyzer.collect.service import (
     collect_snapshot,
     expected_session,
 )
-from finbrief_analyzer.core.config import DEFAULT_QUOTE_SYMBOLS, Settings
+from finbrief_analyzer.core.config import QuoteSymbol, Settings
 
 KST = timezone(timedelta(hours=9))
 # Wednesday. 09:00 KST is Tuesday 20:00 in New York; 22:30 KST is Wednesday 09:30 there.
 KR_OPEN_NOW = datetime(2026, 10, 7, 9, 0, tzinfo=KST)
 US_OPEN_NOW = datetime(2026, 10, 7, 22, 30, tzinfo=KST)
+# Fixed here so these tests do not follow changes to the default symbol list.
+SYMBOLS = (
+    QuoteSymbol(symbol="^KS11", name="KOSPI", market=Market.KR),
+    QuoteSymbol(symbol="^KQ11", name="KOSDAQ", market=Market.KR),
+    QuoteSymbol(symbol="US500", name="S&P 500", market=Market.US),
+    QuoteSymbol(symbol="IXIC", name="나스닥", market=Market.US),
+    QuoteSymbol(symbol="DJI", name="다우존스", market=Market.US),
+    QuoteSymbol(symbol="US10YT", name="미 국채 10년", market=Market.RATE),
+)
+KR_SYMBOLS = ["^KS11", "^KQ11"]
 US_SYMBOLS = ["US500", "IXIC", "DJI", "US10YT"]
-KR_SYMBOLS = ["^KS11", "^KQ11", "US10YT"]
+ALL_SYMBOLS = [*KR_SYMBOLS, *US_SYMBOLS]
 
 
 class _Quotes:
@@ -81,38 +91,40 @@ def _item(n: int, source: str = "yna.co.kr", hours_ago: float = 1.0) -> NewsItem
 
 
 def _us_quotes(day: date = date(2026, 10, 6)) -> _Quotes:
-    return _Quotes(dict.fromkeys(US_SYMBOLS, day))
+    """Every symbol answers. The US ones are dated `day`, the Korean ones are up to date."""
+    kr = dict.fromkeys(KR_SYMBOLS, date(2026, 10, 6))
+    return _Quotes({**kr, **dict.fromkeys(US_SYMBOLS, day)})
 
 
-def test_kr_open_slot_holds_us_indices_fx_and_news_since_the_previous_evening() -> None:
+def test_kr_open_slot_holds_every_symbol_fx_and_news_since_the_previous_evening() -> None:
     # given
     quotes, news = _us_quotes(), _News("rss", [_item(1)])
     providers = Providers(quotes=quotes, rates=_Rates(), news=(news,))
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
-    assert quotes.asked == [US_SYMBOLS]
-    assert [q.symbol for q in snapshot.quotes] == [*US_SYMBOLS, "USD/KRW"]
+    assert quotes.asked == [ALL_SYMBOLS]
+    assert [q.symbol for q in snapshot.quotes] == [*ALL_SYMBOLS, "USD/KRW"]
     assert snapshot.slot is Slot.KR_OPEN
     assert news.since == [datetime(2026, 10, 6, 22, 0, tzinfo=KST)]
     assert len(snapshot.news) == 1
     assert snapshot.missing == ()
 
 
-def test_us_open_slot_holds_kr_indices_fx_and_news_since_this_morning() -> None:
+def test_us_open_slot_holds_every_symbol_fx_and_news_since_this_morning() -> None:
     # given
-    quotes = _Quotes(dict.fromkeys(KR_SYMBOLS, date(2026, 10, 7)))
+    quotes = _Quotes(dict.fromkeys(ALL_SYMBOLS, date(2026, 10, 7)))
     news = _News("rss")
     providers = Providers(quotes=quotes, rates=_Rates(), news=(news,))
 
     # when
-    snapshot = collect_snapshot(Slot.US_OPEN, US_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.US_OPEN, US_OPEN_NOW, providers, SYMBOLS)
 
     # then
-    assert quotes.asked == [KR_SYMBOLS]
-    assert [q.symbol for q in snapshot.quotes] == [*KR_SYMBOLS, "USD/KRW"]
+    assert quotes.asked == [ALL_SYMBOLS]
+    assert [q.symbol for q in snapshot.quotes] == [*ALL_SYMBOLS, "USD/KRW"]
     assert news.since == [datetime(2026, 10, 7, 8, 30, tzinfo=KST)]
 
 
@@ -121,7 +133,7 @@ def test_quotes_are_labelled_with_the_configured_name_and_market() -> None:
     providers = Providers(quotes=_us_quotes(), rates=_Rates())
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then: rate provider quotes are passed through as the provider labelled them
     labels = {q.symbol: (q.name, q.market) for q in snapshot.quotes}
@@ -142,12 +154,12 @@ def test_failing_news_provider_is_recorded_as_missing_and_the_rest_is_kept() -> 
     )
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     assert snapshot.missing == ("marketaux", "dart")
     assert len(snapshot.news) == 1
-    assert len(snapshot.quotes) == 4
+    assert len(snapshot.quotes) == len(ALL_SYMBOLS)
 
 
 def test_quote_provider_failing_entirely_still_gives_a_snapshot_with_news() -> None:
@@ -157,11 +169,11 @@ def test_quote_provider_failing_entirely_still_gives_a_snapshot_with_news() -> N
     )
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     assert snapshot.quotes == ()
-    assert snapshot.missing == tuple(US_SYMBOLS)
+    assert snapshot.missing == tuple(ALL_SYMBOLS)
     assert len(snapshot.news) == 1
 
 
@@ -170,12 +182,10 @@ def test_symbols_no_provider_could_answer_are_recorded_as_missing() -> None:
     quotes = _Quotes({"US500": date(2026, 10, 6), "DJI": date(2026, 10, 6)})
 
     # when
-    snapshot = collect_snapshot(
-        Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=quotes), DEFAULT_QUOTE_SYMBOLS
-    )
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=quotes), SYMBOLS)
 
     # then
-    assert snapshot.missing == ("IXIC", "US10YT")
+    assert snapshot.missing == ("^KS11", "^KQ11", "IXIC", "US10YT")
 
 
 def test_index_older_than_the_last_expected_session_marks_its_market_closed() -> None:
@@ -183,7 +193,7 @@ def test_index_older_than_the_last_expected_session_marks_its_market_closed() ->
     providers = Providers(quotes=_us_quotes(day=date(2026, 10, 5)))
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     assert snapshot.is_closed(Market.US)
@@ -195,7 +205,7 @@ def test_market_with_the_expected_session_is_not_marked_closed() -> None:
     providers = Providers(quotes=_us_quotes(day=date(2026, 10, 6)))
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     assert snapshot.closed_markets == frozenset()
@@ -207,7 +217,7 @@ def test_monday_morning_expects_fridays_us_session_not_the_weekend() -> None:
     providers = Providers(quotes=_us_quotes(day=date(2026, 10, 9)))
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, monday, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, monday, providers, SYMBOLS)
 
     # then
     assert expected_session(Market.US, monday) == date(2026, 10, 9)
@@ -225,9 +235,7 @@ def test_kr_holiday_is_judged_separately_from_the_us_market() -> None:
     )
 
     # when
-    snapshot = collect_snapshot(
-        Slot.US_OPEN, US_OPEN_NOW, Providers(quotes=quotes), DEFAULT_QUOTE_SYMBOLS
-    )
+    snapshot = collect_snapshot(Slot.US_OPEN, US_OPEN_NOW, Providers(quotes=quotes), SYMBOLS)
 
     # then: the rate symbol being a day old says nothing about a market being closed
     assert snapshot.closed_markets == frozenset({Market.KR})
@@ -255,10 +263,10 @@ def test_without_a_rate_provider_the_snapshot_has_no_rates_and_nothing_missing()
     providers = Providers(quotes=_us_quotes())
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
-    assert [q.symbol for q in snapshot.quotes] == US_SYMBOLS
+    assert [q.symbol for q in snapshot.quotes] == ALL_SYMBOLS
     assert snapshot.missing == ()
 
 
@@ -267,7 +275,7 @@ def test_failing_rate_provider_is_recorded_as_missing() -> None:
     providers = Providers(quotes=_us_quotes(), rates=_Rates(error=CollectError("ecos", "x")))
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     assert snapshot.missing == ("ecos",)
@@ -282,22 +290,22 @@ def test_never_raises_whatever_the_providers_raise() -> None:
     )
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     assert snapshot.quotes == ()
     assert snapshot.news == ()
-    assert snapshot.missing == (*US_SYMBOLS, "ecos", "rss", "dart")
+    assert snapshot.missing == (*ALL_SYMBOLS, "ecos", "rss", "dart")
 
 
 def test_empty_providers_give_an_empty_snapshot() -> None:
     # given / when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, Providers(), DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, Providers(), SYMBOLS)
 
     # then: with no quote provider wired, the wanted symbols are simply missing
     assert snapshot.quotes == ()
     assert snapshot.news == ()
-    assert snapshot.missing == tuple(US_SYMBOLS)
+    assert snapshot.missing == tuple(ALL_SYMBOLS)
 
 
 def test_same_link_from_two_providers_is_kept_once() -> None:
@@ -305,7 +313,7 @@ def test_same_link_from_two_providers_is_kept_once() -> None:
     providers = Providers(news=(_News("rss", [_item(1), _item(2)]), _News("other", [_item(2)])))
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     assert len(snapshot.news) == 2
@@ -318,7 +326,7 @@ def test_news_is_capped_per_source_so_one_publisher_cannot_crowd_out_the_rest() 
     providers = Providers(news=(_News("rss", [*loud, *quiet]),))
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     by_source = [i.source for i in snapshot.news]
@@ -332,7 +340,7 @@ def test_total_news_count_is_capped_and_the_newest_are_kept() -> None:
     providers = Providers(news=(_News("rss", items),))
 
     # when
-    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, DEFAULT_QUOTE_SYMBOLS)
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
 
     # then
     times = [i.published_at for i in snapshot.news]
@@ -345,9 +353,7 @@ def test_naive_now_is_rejected() -> None:
     # given: a caller bug, not a provider failure
     # when / then
     with pytest.raises(ValueError, match="timezone"):
-        collect_snapshot(
-            Slot.KR_OPEN, datetime(2026, 10, 7, 9, 0), Providers(), DEFAULT_QUOTE_SYMBOLS
-        )
+        collect_snapshot(Slot.KR_OPEN, datetime(2026, 10, 7, 9, 0), Providers(), SYMBOLS)
 
 
 @pytest.fixture
@@ -402,3 +408,22 @@ def test_build_providers_skips_rss_when_no_feed_is_configured(
 
     # then
     assert providers.news == ()
+
+
+def test_scale_is_applied_to_the_close_and_the_previous_close() -> None:
+    # given: JPY/KRW is quoted per yen and shown per 100 yen
+    class _Yen:
+        def get_quotes(self, symbols: Sequence[str]) -> QuoteResult:
+            quote = Quote("JPY/KRW", 8.454, date(2026, 10, 6), prev_close=8.463)
+            return QuoteResult((quote,), ())
+
+    symbols = (QuoteSymbol(symbol="JPY/KRW", name="원/100엔", market=Market.FX, scale=100),)
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=_Yen()), symbols)
+
+    # then: the percentage change is unaffected by the scale
+    quote = snapshot.quotes[0]
+    assert quote.close == pytest.approx(845.4)
+    assert quote.prev_close == pytest.approx(846.3)
+    assert quote.change_pct == pytest.approx((8.454 - 8.463) / 8.463 * 100)

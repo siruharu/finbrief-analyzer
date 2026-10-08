@@ -3,26 +3,54 @@
 from collections.abc import Sequence
 from datetime import date
 
-from finbrief_analyzer.collect.models import Market, MarketSnapshot, NewsItem, Quote
+from finbrief_analyzer.collect.models import Market, MarketSnapshot, NewsItem, Quote, Slot
 from finbrief_analyzer.deliver.models import Briefing, LinkItem, Section
 
 # Newest first. Choosing which items matter is the summarising step's job, which does not exist yet.
 MAX_NEWS_ITEMS = 10
 MARKET_LABELS = {Market.KR: "국내", Market.US: "미국"}
+GROUP_TITLES: dict[Market | None, str] = {
+    Market.KR: "국내 증시",
+    Market.US: "미국 증시",
+    Market.ASIA: "아시아 증시",
+    Market.RATE: "금리",
+    Market.FX: "환율",
+    Market.COMMODITY: "원자재·코인",
+    # A quote whose symbol is not in the configured list carries no market.
+    None: "기타",
+}
+_TAIL = (Market.RATE, Market.FX, Market.COMMODITY, None)
+# Each briefing leads with the market that closed just before it.
+GROUP_ORDER: dict[Slot, tuple[Market | None, ...]] = {
+    Slot.KR_OPEN: (Market.US, Market.KR, Market.ASIA, *_TAIL),
+    Slot.US_OPEN: (Market.KR, Market.ASIA, Market.US, *_TAIL),
+}
 
 
 def compose_simple(snapshot: MarketSnapshot, briefing_date: date) -> Briefing:
     return Briefing(
         slot=snapshot.slot,
         briefing_date=briefing_date,
-        sections=(_quote_section(snapshot.quotes), _news_section(snapshot.news)),
+        sections=(*_quote_sections(snapshot), _news_section(snapshot.news)),
         notices=_notices(snapshot),
     )
 
 
-def _quote_section(quotes: Sequence[Quote]) -> Section:
-    # Required: a briefing without a single quote is not worth sending.
-    return Section(title="시세", lines=tuple(_quote_line(q) for q in quotes), required=True)
+def _quote_sections(snapshot: MarketSnapshot) -> tuple[Section, ...]:
+    """One section per market that has quotes, in the slot's order."""
+    groups = [
+        (GROUP_TITLES[market], [q for q in snapshot.quotes if q.market is market])
+        for market in GROUP_ORDER[snapshot.slot]
+    ]
+    filled = [(title, quotes) for title, quotes in groups if quotes]
+    if not filled:
+        # Required and empty: a briefing without a single quote is not worth sending.
+        return (Section(title="시세", required=True),)
+    # Only the first group is required, so one failed source does not block the rest.
+    return tuple(
+        Section(title=title, lines=tuple(_quote_line(q) for q in quotes), required=index == 0)
+        for index, (title, quotes) in enumerate(filled)
+    )
 
 
 def _quote_line(quote: Quote) -> str:
@@ -31,12 +59,14 @@ def _quote_line(quote: Quote) -> str:
         # A yield moving 3.933 -> 3.961 is +2.8bp; as a percentage it would read +0.71%.
         change = "" if quote.change_bp is None else f" ({quote.change_bp:+.1f}bp)"
         return f"{name} {quote.close:.3f}%{change}"
+    # A value around 1 (EUR/USD) would lose its movement at two decimals.
+    digits = 4 if abs(quote.close) < 10 else 2
+    value = f"{name} {quote.close:,.{digits}f}"
     if quote.change is None or quote.change_pct is None:
-        unit = "원" if quote.market is Market.FX else ""
-        return f"{name} {quote.close:,.2f}{unit}"
+        return value
     if quote.market is Market.FX:
-        return f"{name} {quote.close:,.2f}원 ({quote.change:+,.2f}원, {quote.change_pct:+.2f}%)"
-    return f"{name} {quote.close:,.2f} ({quote.change_pct:+.2f}%)"
+        return f"{value} ({quote.change:+,.{digits}f}, {quote.change_pct:+.2f}%)"
+    return f"{value} ({quote.change_pct:+.2f}%)"
 
 
 def _news_section(items: Sequence[NewsItem]) -> Section:
