@@ -1,0 +1,94 @@
+{
+  "topic": "stock-screening",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "PoC: 대량 일봉 조회·종목군 걸러 내기·어긋남 감지·관심 종목 선정",
+      "status": "todo",
+      "after": [],
+      "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-08_screening-poc.md').read_text(encoding='utf-8');assert all(k in t for k in ['yf.download', 'StockListing', '거래대금', '관심 종목', '수정주가'])\"",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 2,
+      "title": "관심 종목 시세",
+      "status": "todo",
+      "after": [
+        1
+      ],
+      "verify": "uv run pytest tests/collect tests/compose tests/test_config.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 3,
+      "title": "일봉·종목군 스키마와 저장소",
+      "status": "todo",
+      "after": [
+        1
+      ],
+      "verify": "uv run pytest tests/store && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 4,
+      "title": "종목군 구성 (시가총액 순위)",
+      "status": "todo",
+      "after": [
+        3
+      ],
+      "verify": "uv run pytest tests/screen/test_universe.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 5,
+      "title": "일봉 출처 어댑터",
+      "status": "todo",
+      "after": [
+        3
+      ],
+      "verify": "uv run pytest tests/screen/test_sources.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 6,
+      "title": "이력 갱신과 처음 받기 명령",
+      "status": "todo",
+      "after": [
+        4,
+        5
+      ],
+      "verify": "uv run pytest tests/screen/test_history.py tests/jobs && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 7,
+      "title": "규칙 (52주 고가 근접·거래량 급증)",
+      "status": "todo",
+      "after": [
+        3
+      ],
+      "verify": "uv run pytest tests/screen/test_rules.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 8,
+      "title": "수집·작성에 연결하고 메일에 싣기",
+      "status": "todo",
+      "after": [
+        2,
+        6,
+        7
+      ],
+      "verify": "uv run pytest tests/compose tests/collect tests/jobs tests/deliver && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    }
+  ]
+}
