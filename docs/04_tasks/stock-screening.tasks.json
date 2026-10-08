@@ -4,22 +4,22 @@
     {
       "id": 1,
       "title": "PoC: 대량 일봉 조회·종목군 걸러 내기·어긋남 감지·관심 종목 선정",
-      "status": "doing",
+      "status": "done",
       "after": [],
       "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-08_screening-poc.md').read_text(encoding='utf-8');assert all(k in t for k in ['yf.download', 'StockListing', '거래대금', '관심 종목', '수정주가'])\"",
       "note": "",
-      "commit": null
+      "commit": "1584bae"
     },
     {
       "id": 2,
       "title": "관심 종목 시세",
-      "status": "todo",
+      "status": "done",
       "after": [
         1
       ],
       "verify": "uv run pytest tests/collect tests/compose tests/test_config.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "378cd9e"
     },
     {
       "id": 3,
@@ -87,6 +87,17 @@
         7
       ],
       "verify": "uv run pytest tests/compose tests/collect tests/jobs tests/deliver && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": null
+    },
+    {
+      "id": 9,
+      "title": "PoC 나머지: 미국 500종목 대량 조회 (Task 1 에서 분리)",
+      "status": "todo",
+      "after": [
+        1
+      ],
+      "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-08_screening-poc.md').read_text(encoding='utf-8');assert 'status: done' in t and '묶음 50' in t\"",
       "note": "",
       "commit": null
     }
