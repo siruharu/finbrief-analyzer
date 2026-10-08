@@ -2,16 +2,18 @@
 
 from dataclasses import dataclass
 from datetime import date
+from typing import Self
 
-from sqlalchemy import ColumnElement, and_, update
+from sqlalchemy import ColumnElement, Engine, and_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from finbrief_analyzer.collect.models import Slot
-from finbrief_analyzer.deliver.models import Channel, DeliveryStatus
+from finbrief_analyzer.core.db import session_scope
+from finbrief_analyzer.deliver.models import Briefing, Channel, DeliveryStatus
 from finbrief_analyzer.store.tables import REASON_MAX_LENGTH, delivery_log
 
-__all__ = ["REASON_MAX_LENGTH", "DeliveryKey", "claim", "mark_failed", "mark_sent"]
+__all__ = ["REASON_MAX_LENGTH", "DeliveryKey", "DeliveryLog", "claim", "mark_failed", "mark_sent"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +24,10 @@ class DeliveryKey:
     slot: Slot
     recipient_id: int
     channel: Channel
+
+    @classmethod
+    def for_email(cls, briefing: Briefing, recipient_id: int) -> Self:
+        return cls(briefing.briefing_date, briefing.slot, recipient_id, Channel.EMAIL)
 
 
 def _matches(key: DeliveryKey) -> ColumnElement[bool]:
@@ -81,3 +87,25 @@ def mark_failed(session: Session, key: DeliveryKey, reason: str) -> None:
         .where(_matches(key))
         .values(status=DeliveryStatus.FAILED.value, reason=reason[:REASON_MAX_LENGTH])
     )
+
+
+class DeliveryLog:
+    """The log bound to an engine. Every call is its own committed transaction.
+
+    A claim has to be committed before the mail goes out, or a second process would not see it.
+    """
+
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def claim(self, key: DeliveryKey) -> bool:
+        with session_scope(self._engine) as session:
+            return claim(session, key)
+
+    def mark_sent(self, key: DeliveryKey) -> None:
+        with session_scope(self._engine) as session:
+            mark_sent(session, key)
+
+    def mark_failed(self, key: DeliveryKey, reason: str) -> None:
+        with session_scope(self._engine) as session:
+            mark_failed(session, key, reason)
