@@ -5,6 +5,7 @@ from pydantic import SecretStr, ValidationError
 
 from finbrief_analyzer.collect.models import Market
 from finbrief_analyzer.core.config import Settings
+from finbrief_analyzer.screen.models import Exchange
 
 
 @pytest.fixture(autouse=True)
@@ -152,3 +153,13 @@ def test_all_symbols_lists_the_indices_first_and_the_watchlist_after() -> None:
 
     # then: one list, so everything is collected in a single request batch
     assert symbols == (*settings.quote_symbols, *settings.watchlist)
+
+
+def test_universe_sizes_default_to_200_kospi_and_150_kosdaq() -> None:
+    # given / when
+    sizes = Settings().universe_sizes()
+
+    # then
+    assert sizes[Exchange.KOSPI] == 200
+    assert sizes[Exchange.KOSDAQ] == 150
+    assert set(sizes) == set(Exchange)

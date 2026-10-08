@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
 from finbrief_analyzer.collect.models import Market
+from finbrief_analyzer.screen.models import Exchange
 
 
 class QuoteSymbol(BaseModel):
@@ -103,6 +104,12 @@ class Settings(BaseSettings):
     # Marketaux timed out at 15s in the PoC, and a timed-out request still costs quota.
     http_timeout_seconds: float = Field(default=30.0, gt=0)
 
+    # Screening universe: the largest common stocks by market value.
+    screen_kospi_size: int = Field(default=200, ge=1)
+    screen_kosdaq_size: int = Field(default=150, ge=1)
+    # The S&P 500 is taken whole; a listing shorter than this is treated as a partial answer.
+    screen_sp500_min_size: int = Field(default=400, ge=1)
+
     # Optional as a group: the web app starts without a database, the briefing job needs it.
     db_host: str | None = None
     db_port: int = 5432
@@ -129,6 +136,14 @@ class Settings(BaseSettings):
     @classmethod
     def _blank_key_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    def universe_sizes(self) -> dict[Exchange, int]:
+        """How many stocks each exchange contributes to the screening universe."""
+        return {
+            Exchange.KOSPI: self.screen_kospi_size,
+            Exchange.KOSDAQ: self.screen_kosdaq_size,
+            Exchange.SP500: self.screen_sp500_min_size,
+        }
 
     def all_symbols(self) -> tuple[QuoteSymbol, ...]:
         """Everything to quote: indices first, then the watchlist."""
