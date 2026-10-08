@@ -58,13 +58,17 @@ def _yahoo_ticker(symbol: str) -> str:
     return SHARE_CLASS_TICKERS.get(symbol, symbol.replace(".", "-"))
 
 
+def pages_for(size: int) -> int:
+    """How many ranking pages of 100 it takes to find `size` common stocks."""
+    return -(-size // 100) + EXTRA_PAGES
+
+
 class NaverUniverseSource:
     def __init__(self, ranking: NaverRanking) -> None:
         self._ranking = ranking
 
     def members(self, exchange: Exchange, size: int) -> list[Member]:
-        pages = -(-size // 100) + EXTRA_PAGES
-        return pick(exchange, self._ranking.fetch(exchange, pages), size)
+        return pick(exchange, self._ranking.fetch(exchange, pages_for(size)), size)
 
 
 def _fdr_sp500() -> Sequence[tuple[str, str]]:  # pragma: no cover - network

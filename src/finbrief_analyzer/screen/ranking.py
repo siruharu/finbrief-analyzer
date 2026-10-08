@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 SOURCE = "naver-ranking"
 URL = "https://m.stock.naver.com/api/stocks/marketValue/{exchange}"
 PAGE_SIZE = 100
+HEADERS = {"User-Agent": "Mozilla/5.0"}
 EXCHANGE_CODES = {Exchange.KOSPI: "KOSPI", Exchange.KOSDAQ: "KOSDAQ"}
 
 
@@ -73,7 +74,10 @@ class NaverRanking:
     def _page(self, exchange: Exchange, page: int) -> list[dict[str, str]]:
         url = URL.format(exchange=EXCHANGE_CODES[exchange])
         try:
-            response = self._client.get(url, params={"page": page, "pageSize": PAGE_SIZE})
+            # The endpoint answered a browser-like agent in the PoC; keep the same conditions.
+            response = self._client.get(
+                url, params={"page": page, "pageSize": PAGE_SIZE}, headers=HEADERS
+            )
             response.raise_for_status()
             stocks = response.json()["stocks"]
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:

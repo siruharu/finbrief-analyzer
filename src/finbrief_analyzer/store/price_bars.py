@@ -2,8 +2,9 @@
 
 from collections.abc import Iterable, Sequence
 from datetime import date
+from typing import Any
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import Row, delete, func, select
 from sqlalchemy.orm import Session
 
 from finbrief_analyzer.screen.models import Bar
@@ -55,10 +56,11 @@ def history(session: Session, symbol: str, since: date) -> list[Bar]:
         .where(price_bars.c.symbol == symbol, price_bars.c.day >= since)
         .order_by(price_bars.c.day)
     )
-    return [
-        Bar(row.symbol, row.day, row.close, row.volume, row.open, row.high, row.low)
-        for row in session.execute(query)
-    ]
+    return [_bar(row) for row in session.execute(query)]
+
+
+def _bar(row: Row[Any]) -> Bar:  # Any: the row's columns are only known at runtime
+    return Bar(row.symbol, row.day, row.close, row.volume, row.open, row.high, row.low)
 
 
 def last_days(session: Session, symbols: Sequence[str]) -> dict[str, date]:
@@ -71,6 +73,23 @@ def last_days(session: Session, symbols: Sequence[str]) -> dict[str, date]:
         .group_by(price_bars.c.symbol)
     )
     return {symbol: day for symbol, day in session.execute(query)}
+
+
+def last_bars(session: Session, symbols: Sequence[str]) -> dict[str, Bar]:
+    """The latest stored bar of each symbol. Symbols without history are absent."""
+    if not symbols:
+        return {}
+    latest = (
+        select(price_bars.c.symbol, func.max(price_bars.c.day).label("day"))
+        .where(price_bars.c.symbol.in_(symbols))
+        .group_by(price_bars.c.symbol)
+        .subquery()
+    )
+    query = select(price_bars).join(
+        latest,
+        (price_bars.c.symbol == latest.c.symbol) & (price_bars.c.day == latest.c.day),
+    )
+    return {row.symbol: _bar(row) for row in session.execute(query)}
 
 
 def delete_symbol(session: Session, symbol: str) -> None:

@@ -4,7 +4,13 @@ from sqlalchemy import Engine
 
 from finbrief_analyzer.core.db import session_scope
 from finbrief_analyzer.screen.models import Bar
-from finbrief_analyzer.store.price_bars import add_bars, delete_symbol, history, last_days
+from finbrief_analyzer.store.price_bars import (
+    add_bars,
+    delete_symbol,
+    history,
+    last_bars,
+    last_days,
+)
 
 
 def _bar(symbol: str, day: int, close: float = 100.0, volume: int = 1000) -> Bar:
@@ -133,3 +139,23 @@ def test_volume_beyond_32_bits_survives(store: Engine) -> None:
 
     # when / then
     assert _history(store, "NVDA")[0].volume == 5_000_000_000
+
+
+def test_last_bars_reads_the_latest_bar_of_every_symbol_at_once(store: Engine) -> None:
+    # given
+    _add(
+        store,
+        _bar("005930", 6, close=1.0),
+        _bar("005930", 8, close=3.0),
+        _bar("NVDA", 7, close=9.0),
+    )
+
+    # when
+    with session_scope(store) as session:
+        found = last_bars(session, ["005930", "NVDA", "AAPL"])
+
+    # then: the close of the last day, and nothing for a symbol without history
+    assert {symbol: (bar.day.day, bar.close) for symbol, bar in found.items()} == {
+        "005930": (8, 3.0),
+        "NVDA": (7, 9.0),
+    }
