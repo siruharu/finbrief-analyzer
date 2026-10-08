@@ -66,9 +66,20 @@ class Settings(BaseSettings):
     db_user: str | None = None
     db_password: SecretStr | None = None
 
+    # Gmail with an app password. Unset means the briefing job cannot send.
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_timeout_seconds: float = Field(default=30.0, gt=0)
+    mail_from_name: str = "finbrief"
+    # Gets a notice when a briefing could not be sent at all.
+    operator_email: str | None = None
+
     @field_validator(
         "marketaux_token", "dart_api_key", "ecos_api_key",
         "db_host", "db_name", "db_user", "db_password",
+        "smtp_user", "smtp_password", "operator_email",
         mode="before",
     )  # fmt: skip
     @classmethod

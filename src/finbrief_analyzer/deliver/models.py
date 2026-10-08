@@ -20,11 +20,16 @@ class DeliveryStatus(StrEnum):
 
 
 class DeliveryError(Exception):
-    """A notifier could not deliver. `retryable` tells the caller whether trying again can help."""
+    """A notifier could not deliver.
 
-    def __init__(self, message: str, *, retryable: bool) -> None:
+    `retryable`: trying the same message again can help.
+    `fatal`: the channel itself is unusable (bad credentials), so other recipients will fail too.
+    """
+
+    def __init__(self, message: str, *, retryable: bool, fatal: bool = False) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.fatal = fatal
 
 
 @dataclass(frozen=True, slots=True)
