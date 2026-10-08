@@ -24,13 +24,13 @@
     {
       "id": 3,
       "title": "DB 기반 (엔진·세션·마이그레이션 환경)",
-      "status": "todo",
+      "status": "done",
       "after": [
         1
       ],
       "verify": "uv run pytest tests/store/test_db.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "0e18946"
     },
     {
       "id": 4,
