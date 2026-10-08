@@ -87,6 +87,17 @@
       "verify": "terraform -chdir=deploy/terraform/service init -backend=false && terraform -chdir=deploy/terraform/service validate",
       "note": "AWS 를 쓰지 않기로 함(2026-10-08 사용자 결정). 로컬 스케줄 방식은 Task 7 뒤에 다시 정한다",
       "commit": null
+    },
+    {
+      "id": 9,
+      "title": "시세 항목 확대와 묶음별 표시",
+      "status": "done",
+      "after": [
+        7
+      ],
+      "verify": "uv run pytest tests/compose tests/collect && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": "daf67ef"
     }
   ]
 }
