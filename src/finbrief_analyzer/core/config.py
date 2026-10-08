@@ -110,6 +110,12 @@ class Settings(BaseSettings):
     # The S&P 500 is taken whole; a listing shorter than this is treated as a partial answer.
     screen_sp500_min_size: int = Field(default=400, ge=1)
 
+    # US bars come from Yahoo in batches. Sizes measured in the screening PoC.
+    screen_batch_size: int = Field(default=100, ge=1)
+    screen_batch_pause_seconds: float = Field(default=1.0, ge=0)
+    # First load: the 52-week rule needs a little more than a year of history.
+    screen_history_days: int = Field(default=400, ge=375)
+
     # Optional as a group: the web app starts without a database, the briefing job needs it.
     db_host: str | None = None
     db_port: int = 5432
