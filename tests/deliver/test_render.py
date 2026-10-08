@@ -182,3 +182,46 @@ def test_empty_optional_section_is_left_out() -> None:
     # then
     assert "뉴스" not in email.text
     assert "뉴스" not in email.html
+
+
+def test_footnotes_are_at_the_very_bottom_of_both_bodies() -> None:
+    # given
+    note = "자동으로 뽑은 목록입니다."
+    briefing = Briefing(
+        slot=Slot.KR_OPEN,
+        briefing_date=date(2026, 10, 8),
+        sections=(QUOTES, _news(LinkItem(title="기사", url="https://example.com/a"))),
+        footnotes=(note,),
+    )
+
+    # when
+    email = render_email(briefing)
+
+    # then
+    assert email.text.rstrip().endswith(f"※ {note}")
+    assert email.text.index(note) > email.text.index("https://example.com/a")
+    assert email.html.index(note) > email.html.index("https://example.com/a")
+
+
+def test_footnote_is_escaped_in_the_html_body() -> None:
+    # given
+    briefing = Briefing(
+        slot=Slot.KR_OPEN,
+        briefing_date=date(2026, 10, 8),
+        sections=(QUOTES,),
+        footnotes=("A&B <b>",),
+    )
+
+    # when
+    email = render_email(briefing)
+
+    # then
+    assert "A&amp;B &lt;b&gt;" in email.html
+
+
+def test_briefing_without_footnotes_ends_with_its_last_section() -> None:
+    # given / when
+    email = render_email(_briefing(QUOTES))
+
+    # then
+    assert email.text.rstrip().endswith("KOSPI 6,803.90 (-1.98%)")

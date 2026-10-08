@@ -10,7 +10,7 @@ import logging
 import sys
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
@@ -23,6 +23,7 @@ from finbrief_analyzer.core.db import make_engine, session_scope
 from finbrief_analyzer.deliver.dispatch import DispatchResult, dispatch
 from finbrief_analyzer.deliver.ports import Notifier
 from finbrief_analyzer.deliver.smtp import SmtpNotifier
+from finbrief_analyzer.screen.service import build_screen_service
 from finbrief_analyzer.store.delivery_log import DeliveryLog
 from finbrief_analyzer.store.recipients import Recipient, list_active
 
@@ -74,7 +75,11 @@ def open_deps(settings: Settings) -> Iterator[JobDeps]:
     notifier = SmtpNotifier(settings)
     engine = make_engine(settings)
     client = make_client(settings)
-    providers = build_providers(settings, client)
+    # None unless APP_SCREEN_ENABLED is set; then it joins the collection as one more source.
+    providers = replace(
+        build_providers(settings, client),
+        screens=build_screen_service(settings, engine, client),
+    )
 
     def recipients() -> list[Recipient]:
         with session_scope(engine) as session:
@@ -83,7 +88,7 @@ def open_deps(settings: Settings) -> Iterator[JobDeps]:
     try:
         yield JobDeps(
             collect=lambda slot, now: collect_snapshot(
-                slot, now, providers, settings.quote_symbols
+                slot, now, providers, settings.all_symbols()
             ),
             recipients=recipients,
             notifier=notifier,

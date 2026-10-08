@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import URL
 
 from finbrief_analyzer.collect.models import Market
+from finbrief_analyzer.screen.models import Exchange
 
 
 class QuoteSymbol(BaseModel):
@@ -44,6 +45,31 @@ DEFAULT_QUOTE_SYMBOLS = (
     QuoteSymbol(symbol="BTC/USD", name="비트코인", market=Market.COMMODITY),
 )
 
+# Ten largest common stocks per country on 2026-10-08, see
+# docs/01_research/2026-10-08_screening-poc.md. A fixed list: it does not follow the ranking.
+DEFAULT_WATCHLIST = (
+    QuoteSymbol(symbol="005930", name="삼성전자", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="000660", name="SK하이닉스", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="402340", name="SK스퀘어", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="009150", name="삼성전기", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="373220", name="LG에너지솔루션", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="005380", name="현대차", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="105560", name="KB금융", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="207940", name="삼성바이오로직스", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="032830", name="삼성생명", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="028260", name="삼성물산", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="NVDA", name="엔비디아", market=Market.US_STOCK),
+    QuoteSymbol(symbol="AAPL", name="애플", market=Market.US_STOCK),
+    QuoteSymbol(symbol="GOOGL", name="알파벳", market=Market.US_STOCK),
+    QuoteSymbol(symbol="MSFT", name="마이크로소프트", market=Market.US_STOCK),
+    QuoteSymbol(symbol="AMZN", name="아마존", market=Market.US_STOCK),
+    QuoteSymbol(symbol="META", name="메타", market=Market.US_STOCK),
+    QuoteSymbol(symbol="AVGO", name="브로드컴", market=Market.US_STOCK),
+    QuoteSymbol(symbol="TSLA", name="테슬라", market=Market.US_STOCK),
+    QuoteSymbol(symbol="BRK-B", name="버크셔 해서웨이", market=Market.US_STOCK),
+    QuoteSymbol(symbol="LLY", name="일라이 릴리", market=Market.US_STOCK),
+)
+
 DEFAULT_KR_RSS_FEEDS = (
     "https://www.hankyung.com/feed/economy",
     "https://www.hankyung.com/feed/finance",
@@ -69,12 +95,37 @@ class Settings(BaseSettings):
 
     # List-valued variables are JSON arrays in the environment.
     quote_symbols: tuple[QuoteSymbol, ...] = DEFAULT_QUOTE_SYMBOLS
+    # Individual stocks shown under their own headings. An empty array turns them off.
+    watchlist: tuple[QuoteSymbol, ...] = DEFAULT_WATCHLIST
     kr_rss_feeds: tuple[str, ...] = DEFAULT_KR_RSS_FEEDS
 
     # Marketaux free plan: 3 articles per request, 100 requests a day, two slots a day.
     marketaux_max_calls_per_slot: int = Field(default=3, ge=1, le=50)
     # Marketaux timed out at 15s in the PoC, and a timed-out request still costs quota.
     http_timeout_seconds: float = Field(default=30.0, gt=0)
+
+    # Off until the first load has run (jobs.backfill_prices); otherwise the briefing job
+    # would try to fetch a year of history for 850 stocks before sending.
+    screen_enabled: bool = False
+    # How many stocks each rule reports per country.
+    screen_top: int = Field(default=5, ge=1, le=20)
+    # 20-day average trading value below which a stock is not screened.
+    screen_min_trading_value_krw: float = Field(default=1_000_000_000, ge=0)
+    screen_min_trading_value_usd: float = Field(default=20_000_000, ge=0)
+    # Time the briefing job may spend bringing the price history up to date.
+    screen_update_seconds: float = Field(default=240.0, gt=0)
+
+    # Screening universe: the largest common stocks by market value.
+    screen_kospi_size: int = Field(default=200, ge=1)
+    screen_kosdaq_size: int = Field(default=150, ge=1)
+    # The S&P 500 is taken whole; a listing shorter than this is treated as a partial answer.
+    screen_sp500_min_size: int = Field(default=400, ge=1)
+
+    # US bars come from Yahoo in batches. Sizes measured in the screening PoC.
+    screen_batch_size: int = Field(default=100, ge=1)
+    screen_batch_pause_seconds: float = Field(default=1.0, ge=0)
+    # First load: the 52-week rule needs a little more than a year of history.
+    screen_history_days: int = Field(default=400, ge=375)
 
     # Optional as a group: the web app starts without a database, the briefing job needs it.
     db_host: str | None = None
@@ -102,6 +153,18 @@ class Settings(BaseSettings):
     @classmethod
     def _blank_key_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    def universe_sizes(self) -> dict[Exchange, int]:
+        """How many stocks each exchange contributes to the screening universe."""
+        return {
+            Exchange.KOSPI: self.screen_kospi_size,
+            Exchange.KOSDAQ: self.screen_kosdaq_size,
+            Exchange.SP500: self.screen_sp500_min_size,
+        }
+
+    def all_symbols(self) -> tuple[QuoteSymbol, ...]:
+        """Everything to quote: indices first, then the watchlist."""
+        return (*self.quote_symbols, *self.watchlist)
 
     def database_url(self) -> URL:
         """Connection URL built from APP_DB_*. Raises ValueError naming what is missing."""

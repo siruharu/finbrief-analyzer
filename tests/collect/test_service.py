@@ -16,6 +16,7 @@ from finbrief_analyzer.collect.service import (
     expected_session,
 )
 from finbrief_analyzer.core.config import QuoteSymbol, Settings
+from finbrief_analyzer.screen.models import Exchange, Rule, ScreenResult
 
 KST = timezone(timedelta(hours=9))
 # Wednesday. 09:00 KST is Tuesday 20:00 in New York; 22:30 KST is Wednesday 09:30 there.
@@ -427,3 +428,102 @@ def test_scale_is_applied_to_the_close_and_the_previous_close() -> None:
     assert quote.close == pytest.approx(845.4)
     assert quote.prev_close == pytest.approx(846.3)
     assert quote.change_pct == pytest.approx((8.454 - 8.463) / 8.463 * 100)
+
+
+WATCHED = (
+    *SYMBOLS,
+    QuoteSymbol(symbol="005930", name="삼성전자", market=Market.KR_STOCK),
+    QuoteSymbol(symbol="NVDA", name="엔비디아", market=Market.US_STOCK),
+)
+
+
+def test_watchlist_stocks_are_collected_in_the_same_request_as_the_indices() -> None:
+    # given
+    as_of = dict.fromkeys([*ALL_SYMBOLS, "005930", "NVDA"], date(2026, 10, 6))
+    quotes = _Quotes(as_of)
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=quotes), WATCHED)
+
+    # then
+    assert quotes.asked == [[*ALL_SYMBOLS, "005930", "NVDA"]]
+    labels = {q.symbol: (q.name, q.market) for q in snapshot.quotes}
+    assert labels["005930"] == ("삼성전자", Market.KR_STOCK)
+    assert labels["NVDA"] == ("엔비디아", Market.US_STOCK)
+
+
+def test_missing_watchlist_stock_is_recorded_and_the_rest_is_kept() -> None:
+    # given: one stock has no data
+    as_of = dict.fromkeys([*ALL_SYMBOLS, "005930"], date(2026, 10, 6))
+
+    # when
+    snapshot = collect_snapshot(
+        Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=_Quotes(as_of)), WATCHED
+    )
+
+    # then
+    assert snapshot.missing == ("NVDA",)
+    assert len(snapshot.quotes) == len(ALL_SYMBOLS) + 1
+
+
+def test_stale_watchlist_stock_does_not_mark_its_market_closed() -> None:
+    # given: a suspended stock whose last row is a week old, while the indices are current
+    as_of = {**dict.fromkeys(ALL_SYMBOLS, date(2026, 10, 6)), "005930": date(2026, 9, 29)}
+
+    # when
+    snapshot = collect_snapshot(
+        Slot.KR_OPEN, KR_OPEN_NOW, Providers(quotes=_Quotes(as_of)), WATCHED
+    )
+
+    # then
+    assert snapshot.closed_markets == frozenset()
+
+
+class _Screens:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.asked: list[datetime] = []
+        self._error = error
+
+    def run(self, now: datetime) -> Sequence[ScreenResult]:
+        self.asked.append(now)
+        if self._error is not None:
+            raise self._error
+        return [ScreenResult(Rule.HIGH_52W, (Exchange.SP500,), date(2026, 10, 6), ())]
+
+
+def test_screening_results_are_carried_in_the_snapshot() -> None:
+    # given
+    screens = _Screens()
+    providers = Providers(quotes=_us_quotes(), screens=screens)
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
+
+    # then
+    assert screens.asked == [KR_OPEN_NOW]
+    assert [result.rule for result in snapshot.screens] == [Rule.HIGH_52W]
+    assert snapshot.missing == ()
+
+
+def test_failing_screening_is_recorded_as_missing_and_the_quotes_are_kept() -> None:
+    # given: the database is down
+    providers = Providers(quotes=_us_quotes(), screens=_Screens(RuntimeError("connection refused")))
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
+
+    # then
+    assert snapshot.screens == ()
+    assert snapshot.missing == ("screen",)
+    assert len(snapshot.quotes) == len(ALL_SYMBOLS)
+
+
+def test_without_a_screening_provider_nothing_is_screened_and_nothing_is_missing() -> None:
+    # given: screening is turned off
+    providers = Providers(quotes=_us_quotes())
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
+
+    # then
+    assert (snapshot.screens, snapshot.missing) == ((), ())

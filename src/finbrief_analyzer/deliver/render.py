@@ -31,6 +31,7 @@ def _label(item: LinkItem) -> str:
 def _text_body(briefing: Briefing) -> str:
     blocks = ["\n".join(f"※ {notice}" for notice in briefing.notices)]
     blocks += [_text_section(section) for section in _visible_sections(briefing)]
+    blocks.append("\n".join(f"※ {note}" for note in briefing.footnotes))
     return "\n\n".join(block for block in blocks if block) + "\n"
 
 
@@ -46,7 +47,10 @@ def _text_section(section: Section) -> str:
 def _html_body(briefing: Briefing) -> str:
     notices = "".join(f"<p><strong>※ {escape(notice)}</strong></p>" for notice in briefing.notices)
     sections = "".join(_html_section(section) for section in _visible_sections(briefing))
-    return f'<html><body style="font-family:sans-serif">{notices}{sections}</body></html>'
+    notes = "".join(
+        f'<p style="color:#666;font-size:0.9em">※ {escape(note)}</p>' for note in briefing.footnotes
+    )
+    return f'<html><body style="font-family:sans-serif">{notices}{sections}{notes}</body></html>'
 
 
 def _html_section(section: Section) -> str:

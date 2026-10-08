@@ -239,3 +239,28 @@ def test_both_backups_satisfy_the_quote_port() -> None:
 
     # then
     assert [p.name for p in providers] == ["yfinance", "naver"]
+
+
+def test_yf_passes_an_unmapped_us_ticker_through_unchanged() -> None:
+    # given: a watchlist stock that has no entry in the ticker table
+    asked: list[str] = []
+
+    def fetch(ticker: str, start: date) -> object:
+        asked.append(ticker)
+        return _yf_frame({"2026-10-05": 180.0, "2026-10-06": 185.0})
+
+    # when
+    quotes = _yf(fetch).get_quotes(["NVDA", "BRK-B"])
+
+    # then
+    assert asked == ["NVDA", "BRK-B"]
+    assert [q.symbol for q in quotes] == ["NVDA", "BRK-B"]
+
+
+def test_yf_does_not_support_a_korean_six_digit_stock_code() -> None:
+    # given: Yahoo would need a .KS or .KQ suffix this adapter does not know
+    provider = _yf(lambda ticker, start: _yf_frame({}))
+
+    # when / then
+    assert not provider.supports("005930")
+    assert not provider.supports("^KQ11")

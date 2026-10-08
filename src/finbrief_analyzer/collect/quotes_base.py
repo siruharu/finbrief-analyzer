@@ -88,7 +88,7 @@ class FrameQuoteProvider:
     def _get_one(self, symbol: str, start: date) -> Quote:
         if not self.supports(symbol):
             raise CollectError(self.name, f"{symbol}: unsupported symbol")
-        ticker = symbol if self._tickers is None else self._tickers[symbol]
+        ticker = symbol if self._tickers is None else self._tickers.get(symbol, symbol)
         try:
             frame = self._fetch(ticker, start)
         except Exception as error:

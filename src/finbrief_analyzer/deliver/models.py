@@ -72,6 +72,8 @@ class Briefing:
     sections: tuple[Section, ...] = ()
     # Shown above the first section: missing sources, closed markets.
     notices: tuple[str, ...] = ()
+    # Shown below the last section: caveats about what the briefing contains.
+    footnotes: tuple[str, ...] = ()
 
     @property
     def is_sendable(self) -> bool:

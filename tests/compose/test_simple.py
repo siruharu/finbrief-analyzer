@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 from finbrief_analyzer.collect.models import Market, MarketSnapshot, NewsItem, Quote, Slot
 from finbrief_analyzer.compose.simple import MAX_NEWS_ITEMS, compose_simple
 from finbrief_analyzer.deliver.models import Briefing, Section
+from finbrief_analyzer.screen.models import Exchange, Rule, ScreenHit, ScreenResult
 
 DAY = date(2026, 10, 8)
 AS_OF = date(2026, 10, 7)
@@ -229,3 +230,154 @@ def test_news_is_capped_keeping_the_newest_items() -> None:
     # then
     assert len(links) == MAX_NEWS_ITEMS
     assert links[0].title == "기사 0"
+
+
+SAMSUNG = Quote(
+    "005930", 266750.0, AS_OF, prev_close=268500.0, name="삼성전자", market=Market.KR_STOCK
+)
+NVIDIA = Quote("NVDA", 235.12, AS_OF, prev_close=231.0, name="엔비디아", market=Market.US_STOCK)
+
+
+def test_watchlist_stocks_get_one_group_per_country() -> None:
+    # given
+    snapshot = _snapshot(quotes=(SP500, SAMSUNG, NVIDIA))
+
+    # when
+    briefing = compose_simple(snapshot, DAY)
+
+    # then
+    assert _section(briefing, "국내 관심 종목").lines == ("삼성전자 266,750 (-0.65%)",)
+    assert _section(briefing, "미국 관심 종목").lines == ("엔비디아 235.12 (+1.78%)",)
+
+
+def test_watchlist_groups_come_after_every_market_group_in_both_slots() -> None:
+    # given
+    quotes = (*EVERY_MARKET, SAMSUNG, NVIDIA)
+
+    # when
+    kr = _quote_titles(compose_simple(_snapshot(quotes=quotes, slot=Slot.KR_OPEN), DAY))
+    us = _quote_titles(compose_simple(_snapshot(quotes=quotes, slot=Slot.US_OPEN), DAY))
+
+    # then
+    assert kr[-2:] == ["국내 관심 종목", "미국 관심 종목"]
+    assert us[-2:] == ["국내 관심 종목", "미국 관심 종목"]
+
+
+def test_korean_stock_price_is_shown_without_decimals() -> None:
+    # given: won prices are whole numbers
+    lonely = Quote("000660", 1750000.0, AS_OF, name="SK하이닉스", market=Market.KR_STOCK)
+
+    # when / then
+    assert _lines(_snapshot(quotes=(lonely,))) == ("SK하이닉스 1,750,000",)
+
+
+def test_watchlist_alone_still_makes_a_sendable_briefing() -> None:
+    # given: every index failed, the watchlist came in
+    briefing = compose_simple(_snapshot(quotes=(SAMSUNG,)), DAY)
+
+    # when / then
+    assert briefing.is_sendable is True
+
+
+HIGH_KR = ScreenResult(
+    Rule.HIGH_52W,
+    (Exchange.KOSPI, Exchange.KOSDAQ),
+    AS_OF,
+    (ScreenHit("096770", "SK이노베이션", 142500.0, 4.21, 1.0),),
+)
+VOLUME_US = ScreenResult(
+    Rule.VOLUME_SPIKE, (Exchange.SP500,), AS_OF, (ScreenHit("MRNA", "Moderna", 88.4, None, 6.84),)
+)
+
+
+def _screened(*results: ScreenResult, quotes: tuple[Quote, ...] = (SP500,)) -> Briefing:
+    snapshot = MarketSnapshot(Slot.KR_OPEN, quotes=quotes, news=(_news(1),), screens=results)
+    return compose_simple(snapshot, DAY)
+
+
+def test_screen_result_becomes_a_section_named_after_the_country_and_the_rule() -> None:
+    # given / when
+    briefing = _screened(HIGH_KR, VOLUME_US)
+
+    # then
+    titles = [section.title for section in briefing.sections]
+    assert "조건 충족 종목 — 국내 52주 신고가 근접" in titles
+    assert "조건 충족 종목 — 미국 거래량 급증" in titles
+
+
+def test_screen_section_titles_never_call_the_list_a_recommendation() -> None:
+    # given / when
+    briefing = _screened(HIGH_KR, VOLUME_US)
+
+    # then
+    text = " ".join(section.title for section in briefing.sections)
+    assert all(word not in text for word in ("추천", "매수", "유망"))
+
+
+def test_screen_section_starts_with_the_rule_and_the_day_it_was_measured_on() -> None:
+    # given / when
+    section = _section(_screened(HIGH_KR), "조건 충족 종목 — 국내 52주 신고가 근접")
+
+    # then
+    assert section.lines[0] == "종가가 최근 52주 최고 종가에 가까운 순 (2026-10-07 종가 기준)"
+
+
+def test_high_hit_line_shows_name_close_move_and_distance_from_the_high() -> None:
+    # given / when
+    section = _section(_screened(HIGH_KR), "조건 충족 종목 — 국내 52주 신고가 근접")
+
+    # then: a won price has no decimals
+    assert section.lines[1] == "SK이노베이션 142,500 (+4.21%) · 고가 대비 100.0%"
+
+
+def test_volume_hit_line_shows_the_multiple_and_leaves_out_an_unknown_move() -> None:
+    # given / when
+    section = _section(_screened(VOLUME_US), "조건 충족 종목 — 미국 거래량 급증")
+
+    # then: a dollar price keeps two decimals
+    assert section.lines[1] == "Moderna 88.40 · 평소의 6.8배"
+
+
+def test_screen_sections_come_after_the_quotes_and_before_the_news() -> None:
+    # given / when
+    titles = [section.title for section in _screened(HIGH_KR, quotes=(SP500, SAMSUNG)).sections]
+
+    # then
+    screen = titles.index("조건 충족 종목 — 국내 52주 신고가 근접")
+    assert titles.index("국내 관심 종목") < screen < titles.index("뉴스")
+
+
+def test_rule_without_hits_makes_no_section() -> None:
+    # given
+    empty = ScreenResult(Rule.HIGH_52W, (Exchange.SP500,), AS_OF, ())
+
+    # when
+    briefing = _screened(empty)
+
+    # then
+    assert not any("조건 충족" in section.title for section in briefing.sections)
+    assert briefing.footnotes == ()
+
+
+def test_disclaimer_is_a_footnote_whenever_a_screen_section_is_shown() -> None:
+    # given / when
+    briefing = _screened(HIGH_KR)
+
+    # then
+    (note,) = briefing.footnotes
+    assert "권하는 것이 아니며" in note
+    assert "검증하지 않았습니다" in note
+
+
+def test_briefing_without_screens_has_no_footnote() -> None:
+    # given / when / then
+    assert compose_simple(_snapshot(), DAY).footnotes == ()
+
+
+def test_screens_alone_do_not_make_a_briefing_sendable() -> None:
+    # given: every quote failed, screening worked
+    briefing = _screened(HIGH_KR, quotes=())
+
+    # when / then: the required section is still the quotes
+    assert briefing.is_sendable is False
+    assert all(not section.required for section in briefing.sections if "조건" in section.title)

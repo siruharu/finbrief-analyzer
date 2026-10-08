@@ -20,6 +20,7 @@ from finbrief_analyzer.collect.models import (
 from finbrief_analyzer.collect.ports import NewsProvider, RateProvider
 from finbrief_analyzer.collect.quotes_fallback import QuoteResult
 from finbrief_analyzer.core.config import QuoteSymbol
+from finbrief_analyzer.screen.models import ScreenResult
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +30,20 @@ NEWS_LOOKBACK = {
     Slot.US_OPEN: timedelta(hours=14),
 }
 MAX_NEWS = 80
+# Name under which a failed screening run shows up in MarketSnapshot.missing.
+SCREEN = "screen"
 MAX_NEWS_PER_SOURCE = 15
 # Local closing time per exchange. Rates and FX have no session to be closed.
 MARKET_CLOSE = {
     Market.KR: (ZoneInfo("Asia/Seoul"), time(15, 30)),
     Market.US: (ZoneInfo("America/New_York"), time(16, 0)),
 }
+
+
+class ScreenProvider(Protocol):
+    def run(self, now: datetime) -> Sequence[ScreenResult]:
+        """Stocks that met a screening rule on the last completed session."""
+        ...
 
 
 class QuoteCollector(Protocol):
@@ -50,6 +59,8 @@ class Providers:
     quotes: QuoteCollector | None = None
     rates: RateProvider | None = None
     news: tuple[NewsProvider, ...] = ()
+    # Absent when screening is turned off.
+    screens: ScreenProvider | None = None
 
 
 def collect_snapshot(
@@ -62,12 +73,14 @@ def collect_snapshot(
     quotes = _labelled(_collect_quotes(providers.quotes, [s.symbol for s in symbols]), symbols)
     rates, rates_missing = _collect_rates(providers.rates)
     news, news_missing = _collect_news(providers.news, now - NEWS_LOOKBACK[slot])
+    screens, screens_missing = _collect_screens(providers.screens, now)
     return MarketSnapshot(
         slot=slot,
         quotes=(*quotes.quotes, *rates),
         news=news,
-        missing=(*quotes.missing, *rates_missing, *news_missing),
+        missing=(*quotes.missing, *rates_missing, *news_missing, *screens_missing),
         closed_markets=_closed_markets(quotes.quotes, now),
+        screens=screens,
     )
 
 
@@ -124,6 +137,15 @@ def _collect_rates(provider: RateProvider | None) -> tuple[tuple[Quote, ...], tu
         return (), ()
     rates = _attempt(provider.name, provider.get_rates)
     return ((), (provider.name,)) if rates is None else (tuple(rates), ())
+
+
+def _collect_screens(
+    provider: ScreenProvider | None, now: datetime
+) -> tuple[tuple[ScreenResult, ...], tuple[str, ...]]:
+    if provider is None:
+        return (), ()
+    screens = _attempt(SCREEN, partial(provider.run, now))
+    return ((), (SCREEN,)) if screens is None else (tuple(screens), ())
 
 
 def _collect_news(
