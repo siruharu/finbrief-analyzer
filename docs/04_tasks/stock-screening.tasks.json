@@ -80,7 +80,7 @@
     {
       "id": 8,
       "title": "수집·작성에 연결하고 메일에 싣기",
-      "status": "todo",
+      "status": "done",
       "after": [
         2,
         6,
@@ -88,7 +88,7 @@
       ],
       "verify": "uv run pytest tests/compose tests/collect tests/jobs tests/deliver && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "e0c4f44"
     },
     {
       "id": 9,
