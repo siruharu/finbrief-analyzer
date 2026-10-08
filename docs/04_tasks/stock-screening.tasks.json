@@ -69,13 +69,13 @@
     {
       "id": 7,
       "title": "규칙 (52주 고가 근접·거래량 급증)",
-      "status": "todo",
+      "status": "done",
       "after": [
         3
       ],
       "verify": "uv run pytest tests/screen/test_rules.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "629287a"
     },
     {
       "id": 8,
