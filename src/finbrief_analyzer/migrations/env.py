@@ -1,12 +1,10 @@
 """Alembic environment. The connection URL comes from Settings, never from the ini file."""
 
 from alembic import context
-from sqlalchemy import URL, MetaData, create_engine
+from sqlalchemy import URL, create_engine
 
 from finbrief_analyzer.core.config import get_settings
-
-# No tables yet. The first schema migration points this at the store's metadata.
-target_metadata: MetaData | None = None
+from finbrief_analyzer.store.tables import metadata as target_metadata
 
 
 def _url() -> str | URL:
