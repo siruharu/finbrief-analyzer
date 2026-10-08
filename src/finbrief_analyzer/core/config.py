@@ -104,6 +104,17 @@ class Settings(BaseSettings):
     # Marketaux timed out at 15s in the PoC, and a timed-out request still costs quota.
     http_timeout_seconds: float = Field(default=30.0, gt=0)
 
+    # Off until the first load has run (jobs.backfill_prices); otherwise the briefing job
+    # would try to fetch a year of history for 850 stocks before sending.
+    screen_enabled: bool = False
+    # How many stocks each rule reports per country.
+    screen_top: int = Field(default=5, ge=1, le=20)
+    # 20-day average trading value below which a stock is not screened.
+    screen_min_trading_value_krw: float = Field(default=1_000_000_000, ge=0)
+    screen_min_trading_value_usd: float = Field(default=20_000_000, ge=0)
+    # Time the briefing job may spend bringing the price history up to date.
+    screen_update_seconds: float = Field(default=240.0, gt=0)
+
     # Screening universe: the largest common stocks by market value.
     screen_kospi_size: int = Field(default=200, ge=1)
     screen_kosdaq_size: int = Field(default=150, ge=1)

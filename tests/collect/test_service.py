@@ -16,6 +16,7 @@ from finbrief_analyzer.collect.service import (
     expected_session,
 )
 from finbrief_analyzer.core.config import QuoteSymbol, Settings
+from finbrief_analyzer.screen.models import Exchange, Rule, ScreenResult
 
 KST = timezone(timedelta(hours=9))
 # Wednesday. 09:00 KST is Tuesday 20:00 in New York; 22:30 KST is Wednesday 09:30 there.
@@ -476,3 +477,53 @@ def test_stale_watchlist_stock_does_not_mark_its_market_closed() -> None:
 
     # then
     assert snapshot.closed_markets == frozenset()
+
+
+class _Screens:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.asked: list[datetime] = []
+        self._error = error
+
+    def run(self, now: datetime) -> Sequence[ScreenResult]:
+        self.asked.append(now)
+        if self._error is not None:
+            raise self._error
+        return [ScreenResult(Rule.HIGH_52W, (Exchange.SP500,), date(2026, 10, 6), ())]
+
+
+def test_screening_results_are_carried_in_the_snapshot() -> None:
+    # given
+    screens = _Screens()
+    providers = Providers(quotes=_us_quotes(), screens=screens)
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
+
+    # then
+    assert screens.asked == [KR_OPEN_NOW]
+    assert [result.rule for result in snapshot.screens] == [Rule.HIGH_52W]
+    assert snapshot.missing == ()
+
+
+def test_failing_screening_is_recorded_as_missing_and_the_quotes_are_kept() -> None:
+    # given: the database is down
+    providers = Providers(quotes=_us_quotes(), screens=_Screens(RuntimeError("connection refused")))
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
+
+    # then
+    assert snapshot.screens == ()
+    assert snapshot.missing == ("screen",)
+    assert len(snapshot.quotes) == len(ALL_SYMBOLS)
+
+
+def test_without_a_screening_provider_nothing_is_screened_and_nothing_is_missing() -> None:
+    # given: screening is turned off
+    providers = Providers(quotes=_us_quotes())
+
+    # when
+    snapshot = collect_snapshot(Slot.KR_OPEN, KR_OPEN_NOW, providers, SYMBOLS)
+
+    # then
+    assert (snapshot.screens, snapshot.missing) == ((), ())

@@ -7,6 +7,7 @@ from finbrief_analyzer.screen.models import Bar
 from finbrief_analyzer.store.price_bars import (
     add_bars,
     delete_symbol,
+    histories,
     history,
     last_bars,
     last_days,
@@ -158,4 +159,19 @@ def test_last_bars_reads_the_latest_bar_of_every_symbol_at_once(store: Engine) -
     assert {symbol: (bar.day.day, bar.close) for symbol, bar in found.items()} == {
         "005930": (8, 3.0),
         "NVDA": (7, 9.0),
+    }
+
+
+def test_histories_reads_many_symbols_in_one_go_each_oldest_first(store: Engine) -> None:
+    # given
+    _add(store, _bar("005930", 8), _bar("005930", 6), _bar("NVDA", 7), _bar("AAPL", 7))
+
+    # when
+    with session_scope(store) as session:
+        found = histories(session, ["005930", "NVDA", "TSLA"], date(2026, 10, 7))
+
+    # then: only what was asked for, from `since` on
+    assert {symbol: [bar.day.day for bar in bars] for symbol, bars in found.items()} == {
+        "005930": [8],
+        "NVDA": [7],
     }

@@ -59,6 +59,21 @@ def history(session: Session, symbol: str, since: date) -> list[Bar]:
     return [_bar(row) for row in session.execute(query)]
 
 
+def histories(session: Session, symbols: Sequence[str], since: date) -> dict[str, list[Bar]]:
+    """Bars of many stocks from `since` on, oldest first, in one query."""
+    if not symbols:
+        return {}
+    query = (
+        select(price_bars)
+        .where(price_bars.c.symbol.in_(symbols), price_bars.c.day >= since)
+        .order_by(price_bars.c.symbol, price_bars.c.day)
+    )
+    found: dict[str, list[Bar]] = {}
+    for row in session.execute(query):
+        found.setdefault(row.symbol, []).append(_bar(row))
+    return found
+
+
 def _bar(row: Row[Any]) -> Bar:  # Any: the row's columns are only known at runtime
     return Bar(row.symbol, row.day, row.close, row.volume, row.open, row.high, row.low)
 

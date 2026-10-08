@@ -9,10 +9,11 @@ from sqlalchemy import Engine
 
 from finbrief_analyzer.core.config import Settings
 from finbrief_analyzer.core.db import session_scope
-from finbrief_analyzer.jobs.backfill_prices import ScreenDeps, main
+from finbrief_analyzer.jobs.backfill_prices import main
 from finbrief_analyzer.screen.history import HistorySources
 from finbrief_analyzer.screen.models import Bar, Exchange, Member
 from finbrief_analyzer.screen.ranking import RankRow
+from finbrief_analyzer.screen.service import ScreenDeps
 from finbrief_analyzer.screen.sources import BatchResult
 from finbrief_analyzer.store.price_bars import history
 from finbrief_analyzer.store.universe import members

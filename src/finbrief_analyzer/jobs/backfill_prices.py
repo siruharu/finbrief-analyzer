@@ -8,37 +8,18 @@ briefing job does the same update with a time limit; this one has none.
 
 import logging
 import sys
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass
 from datetime import UTC, datetime
-
-from sqlalchemy import Engine
 
 from finbrief_analyzer.collect.factory import make_client
 from finbrief_analyzer.core.config import Settings, get_settings
 from finbrief_analyzer.core.db import make_engine, session_scope
-from finbrief_analyzer.screen.history import HistorySources, UpdateReport, update_history
-from finbrief_analyzer.screen.models import Exchange
-from finbrief_analyzer.screen.ranking import NaverRanking
-from finbrief_analyzer.screen.sources import FdrHistorySource, YfBatchSource
-from finbrief_analyzer.screen.universe import (
-    NaverUniverseSource,
-    Sp500UniverseSource,
-    UniverseSource,
-    refresh_universe,
-)
+from finbrief_analyzer.screen.history import UpdateReport, update_history
+from finbrief_analyzer.screen.service import ScreenDeps, build_screen_deps
+from finbrief_analyzer.screen.universe import refresh_universe
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class ScreenDeps:
-    """What the price history is built from. Shared with the briefing job."""
-
-    engine: Engine
-    sources: HistorySources
-    universe: Mapping[Exchange, UniverseSource]
 
 
 OpenJob = Callable[[Settings], AbstractContextManager[ScreenDeps]]
@@ -49,21 +30,8 @@ def open_deps(settings: Settings) -> Iterator[ScreenDeps]:
     """Wire the real sources and release them afterwards. Fails here without a database."""
     engine = make_engine(settings)
     client = make_client(settings)
-    ranking = NaverRanking(client)
-    korean = NaverUniverseSource(ranking)
-    batch = YfBatchSource(
-        batch_size=settings.screen_batch_size, pause_seconds=settings.screen_batch_pause_seconds
-    )
     try:
-        yield ScreenDeps(
-            engine=engine,
-            sources=HistorySources(ranking, FdrHistorySource(), batch),
-            universe={
-                Exchange.KOSPI: korean,
-                Exchange.KOSDAQ: korean,
-                Exchange.SP500: Sp500UniverseSource(),
-            },
-        )
+        yield build_screen_deps(settings, engine, client)
     finally:
         client.close()
         engine.dispose()

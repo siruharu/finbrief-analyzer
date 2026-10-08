@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 
+from finbrief_analyzer.screen.models import ScreenResult
+
 
 class Slot(StrEnum):
     """Which briefing is being prepared."""
@@ -99,6 +101,8 @@ class MarketSnapshot:
     # Names of sources that failed, in the order they were tried.
     missing: tuple[str, ...] = ()
     closed_markets: frozenset[Market] = frozenset()
+    # Stocks that met a screening rule. Empty when screening is off or failed.
+    screens: tuple[ScreenResult, ...] = ()
 
     def is_closed(self, market: Market) -> bool:
         return market in self.closed_markets

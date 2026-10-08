@@ -5,6 +5,7 @@ from datetime import date
 
 from finbrief_analyzer.collect.models import Market, MarketSnapshot, NewsItem, Quote, Slot
 from finbrief_analyzer.deliver.models import Briefing, LinkItem, Section
+from finbrief_analyzer.screen.models import Exchange, Rule, ScreenHit, ScreenResult
 
 # Newest first. Choosing which items matter is the summarising step's job, which does not exist yet.
 MAX_NEWS_ITEMS = 10
@@ -29,13 +30,58 @@ GROUP_ORDER: dict[Slot, tuple[Market | None, ...]] = {
 }
 
 
+# The list is what a rule produced, not advice. The words 추천, 매수 and 유망 stay out of it.
+SCREEN_TITLE = "조건 충족 종목"
+RULE_TITLES = {Rule.HIGH_52W: "52주 신고가 근접", Rule.VOLUME_SPIKE: "거래량 급증"}
+RULE_NOTES = {
+    Rule.HIGH_52W: "종가가 최근 52주 최고 종가에 가까운 순",
+    Rule.VOLUME_SPIKE: "거래량이 직전 20일 평균의 몇 배인지",
+}
+DISCLAIMER = (
+    "조건 충족 종목은 정해진 규칙에 따라 자동으로 뽑은 목록입니다. 매수·매도를 권하는 것이 "
+    "아니며, 이 규칙이 수익으로 이어지는지는 과거 자료로 검증하지 않았습니다. "
+    "투자 판단과 그 결과는 본인에게 있습니다."
+)
+
+
 def compose_simple(snapshot: MarketSnapshot, briefing_date: date) -> Briefing:
+    screens = _screen_sections(snapshot.screens)
     return Briefing(
         slot=snapshot.slot,
         briefing_date=briefing_date,
-        sections=(*_quote_sections(snapshot), _news_section(snapshot.news)),
+        sections=(*_quote_sections(snapshot), *screens, _news_section(snapshot.news)),
         notices=_notices(snapshot),
+        footnotes=(DISCLAIMER,) if screens else (),
     )
+
+
+def _screen_sections(results: Sequence[ScreenResult]) -> tuple[Section, ...]:
+    """One section per rule and country that has hits. Never required."""
+    return tuple(
+        Section(
+            title=f"{SCREEN_TITLE} — {_country(result)} {RULE_TITLES[result.rule]}",
+            lines=(
+                f"{RULE_NOTES[result.rule]} ({result.as_of.isoformat()} 종가 기준)",
+                *(_hit_line(hit, result) for hit in result.hits),
+            ),
+        )
+        for result in results
+        if result.hits
+    )
+
+
+def _country(result: ScreenResult) -> str:
+    return "미국" if Exchange.SP500 in result.exchanges else "국내"
+
+
+def _hit_line(hit: ScreenHit, result: ScreenResult) -> str:
+    digits = 2 if Exchange.SP500 in result.exchanges else 0  # won prices are whole numbers
+    move = "" if hit.change_pct is None else f" ({hit.change_pct:+.2f}%)"
+    if result.rule is Rule.HIGH_52W:
+        detail = f"고가 대비 {hit.score * 100:.1f}%"
+    else:
+        detail = f"평소의 {hit.score:.1f}배"
+    return f"{hit.name} {hit.close:,.{digits}f}{move} · {detail}"
 
 
 def _quote_sections(snapshot: MarketSnapshot) -> tuple[Section, ...]:
