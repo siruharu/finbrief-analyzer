@@ -93,13 +93,13 @@
     {
       "id": 9,
       "title": "PoC 나머지: 미국 500종목 대량 조회 (Task 1 에서 분리)",
-      "status": "todo",
+      "status": "done",
       "after": [
         1
       ],
       "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-08_screening-poc.md').read_text(encoding='utf-8');assert 'status: done' in t and '묶음 50' in t\"",
       "note": "",
-      "commit": null
+      "commit": "71a4f14"
     }
   ]
 }
