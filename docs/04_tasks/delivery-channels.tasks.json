@@ -69,13 +69,13 @@
     {
       "id": 7,
       "title": "단순 작성기 v0 와 작업 엔트리포인트",
-      "status": "todo",
+      "status": "done",
       "after": [
         6
       ],
       "verify": "uv run pytest tests/jobs && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "18bc7d5"
     },
     {
       "id": 8,
