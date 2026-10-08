@@ -35,3 +35,29 @@ class Member:
     exchange: Exchange
     symbol: str
     name: str
+
+
+class Rule(StrEnum):
+    HIGH_52W = "high_52w"
+    VOLUME_SPIKE = "volume_spike"
+
+
+@dataclass(frozen=True, slots=True)
+class ScreenHit:
+    """One stock that met a rule, with what the briefing needs to show it."""
+
+    symbol: str
+    name: str
+    close: float
+    change_pct: float | None
+    score: float
+
+
+@dataclass(frozen=True, slots=True)
+class ScreenResult:
+    """The stocks of one exchange group that met one rule on one trading day."""
+
+    rule: Rule
+    exchanges: tuple[Exchange, ...]
+    as_of: date
+    hits: tuple[ScreenHit, ...]
