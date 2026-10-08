@@ -4,6 +4,7 @@ from functools import lru_cache
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy import URL
 
 from finbrief_analyzer.collect.models import Market
 
@@ -58,10 +59,42 @@ class Settings(BaseSettings):
     # Marketaux timed out at 15s in the PoC, and a timed-out request still costs quota.
     http_timeout_seconds: float = Field(default=30.0, gt=0)
 
-    @field_validator("marketaux_token", "dart_api_key", "ecos_api_key", mode="before")
+    # Optional as a group: the web app starts without a database, the briefing job needs it.
+    db_host: str | None = None
+    db_port: int = 5432
+    db_name: str | None = None
+    db_user: str | None = None
+    db_password: SecretStr | None = None
+
+    @field_validator(
+        "marketaux_token", "dart_api_key", "ecos_api_key",
+        "db_host", "db_name", "db_user", "db_password",
+        mode="before",
+    )  # fmt: skip
     @classmethod
     def _blank_key_is_unset(cls, value: object) -> object:
         return None if isinstance(value, str) and not value.strip() else value
+
+    def database_url(self) -> URL:
+        """Connection URL built from APP_DB_*. Raises ValueError naming what is missing."""
+        required = {
+            "APP_DB_HOST": self.db_host,
+            "APP_DB_NAME": self.db_name,
+            "APP_DB_USER": self.db_user,
+            "APP_DB_PASSWORD": self.db_password,
+        }
+        missing = [name for name, value in required.items() if value is None]
+        if missing or self.db_password is None:
+            raise ValueError(f"database is not configured, missing: {', '.join(missing)}")
+        # URL.create escapes reserved characters; never build this by string concatenation.
+        return URL.create(
+            "postgresql+psycopg",
+            username=self.db_user,
+            password=self.db_password.get_secret_value(),
+            host=self.db_host,
+            port=self.db_port,
+            database=self.db_name,
+        )
 
 
 @lru_cache
