@@ -46,13 +46,13 @@
     {
       "id": 5,
       "title": "SMTP Notifier",
-      "status": "todo",
+      "status": "done",
       "after": [
         2
       ],
       "verify": "uv run pytest tests/deliver/test_smtp.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "415b738"
     },
     {
       "id": 6,
