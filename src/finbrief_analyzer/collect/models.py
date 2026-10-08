@@ -16,8 +16,11 @@ class Slot(StrEnum):
 class Market(StrEnum):
     KR = "kr"
     US = "us"
+    ASIA = "asia"
     FX = "fx"
     RATE = "rate"
+    # Commodity futures and crypto: traded around the clock, so the value is a live one.
+    COMMODITY = "commodity"
 
 
 class CollectError(Exception):

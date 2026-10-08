@@ -23,11 +23,6 @@ from finbrief_analyzer.core.config import QuoteSymbol
 
 logger = logging.getLogger(__name__)
 
-# Each briefing reports the market that closed before it, plus rates.
-SLOT_MARKETS = {
-    Slot.KR_OPEN: (Market.US, Market.RATE),
-    Slot.US_OPEN: (Market.KR, Market.RATE),
-}
 # Back to roughly the previous slot (about 09:00 and 22:30 KST), with some margin.
 NEWS_LOOKBACK = {
     Slot.KR_OPEN: timedelta(hours=11),
@@ -63,8 +58,8 @@ def collect_snapshot(
     """Collect everything for the slot. Provider failures never raise from here."""
     if now.utcoffset() is None:
         raise ValueError("now must have a timezone")
-    wanted = [s for s in symbols if s.market in SLOT_MARKETS[slot]]
-    quotes = _labelled(_collect_quotes(providers.quotes, [s.symbol for s in wanted]), wanted)
+    # Every slot carries every symbol; which market leads is the composer's decision.
+    quotes = _labelled(_collect_quotes(providers.quotes, [s.symbol for s in symbols]), symbols)
     rates, rates_missing = _collect_rates(providers.rates)
     news, news_missing = _collect_news(providers.news, now - NEWS_LOOKBACK[slot])
     return MarketSnapshot(
@@ -105,15 +100,23 @@ def _collect_quotes(collector: QuoteCollector | None, symbols: Sequence[str]) ->
 
 
 def _labelled(result: QuoteResult, wanted: Sequence[QuoteSymbol]) -> QuoteResult:
-    """Attach the configured display name and market to each quote."""
+    """Attach the configured display name and market to each quote, and apply its scale."""
     by_symbol = {s.symbol: s for s in wanted}
     quotes = tuple(
-        replace(q, name=by_symbol[q.symbol].name, market=by_symbol[q.symbol].market)
-        if q.symbol in by_symbol
-        else q
-        for q in result.quotes
+        _label(q, by_symbol[q.symbol]) if q.symbol in by_symbol else q for q in result.quotes
     )
     return QuoteResult(quotes=quotes, missing=result.missing)
+
+
+def _label(quote: Quote, symbol: QuoteSymbol) -> Quote:
+    prev_close = None if quote.prev_close is None else quote.prev_close * symbol.scale
+    return replace(
+        quote,
+        name=symbol.name,
+        market=symbol.market,
+        close=quote.close * symbol.scale,
+        prev_close=prev_close,
+    )
 
 
 def _collect_rates(provider: RateProvider | None) -> tuple[tuple[Quote, ...], tuple[str, ...]]:

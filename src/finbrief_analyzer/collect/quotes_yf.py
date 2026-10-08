@@ -1,4 +1,4 @@
-"""Backup quote adapter backed by yfinance, for US symbols.
+"""Backup quote adapter backed by yfinance, for everything but the Korean indices.
 
 It reads the same Yahoo data as the primary adapter, so it covers a broken
 FinanceDataReader release, not a Yahoo outage.
@@ -16,7 +16,21 @@ YF_TICKERS = {
     "US500": "^GSPC",
     "IXIC": "^IXIC",
     "DJI": "^DJI",
+    "^SOX": "^SOX",
+    "^RUT": "^RUT",
+    "^VIX": "^VIX",
+    "^N225": "^N225",
+    "SSEC": "000001.SS",
+    "^HSI": "^HSI",
     "US10YT": "^TNX",
+    "DX-Y.NYB": "DX-Y.NYB",
+    "USD/JPY": "JPY=X",
+    "JPY/KRW": "JPYKRW=X",
+    "EUR/USD": "EURUSD=X",
+    "CL=F": "CL=F",
+    "GC=F": "GC=F",
+    "HG=F": "HG=F",
+    "BTC/USD": "BTC-USD",
 }
 
 

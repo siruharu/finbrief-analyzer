@@ -15,7 +15,8 @@ services:
       POSTGRES_DB: finbrief_analyzer
     ports: ["5432:5432"]
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # postgres 18+ 는 데이터를 버전별 하위 디렉터리에 둔다. .../data 가 아니라 부모를 마운트한다
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U finbrief_analyzer"]
       interval: 5s
