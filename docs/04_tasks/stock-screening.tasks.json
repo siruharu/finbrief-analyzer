@@ -57,14 +57,14 @@
     {
       "id": 6,
       "title": "이력 갱신과 처음 받기 명령",
-      "status": "todo",
+      "status": "done",
       "after": [
         4,
         5
       ],
       "verify": "uv run pytest tests/screen/test_history.py tests/jobs && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "a5657e5"
     },
     {
       "id": 7,
