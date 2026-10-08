@@ -4,11 +4,11 @@
     {
       "id": 1,
       "title": "PoC: Gmail SMTP 발송·AWS 로그인·스케줄러·마이그레이션 위치 확인",
-      "status": "todo",
+      "status": "done",
       "after": [],
       "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-07_delivery-poc.md').read_text(encoding='utf-8');assert all(k in t for k in ['smtp.gmail.com', 'DKIM', 'EventBridge', 'RunTask'])\"",
       "note": "",
-      "commit": null
+      "commit": "f440495"
     },
     {
       "id": 2,
@@ -80,12 +80,12 @@
     {
       "id": 8,
       "title": "인프라: 비밀값, 스케줄, 실패 알람",
-      "status": "todo",
+      "status": "blocked",
       "after": [
         7
       ],
       "verify": "terraform -chdir=deploy/terraform/service init -backend=false && terraform -chdir=deploy/terraform/service validate",
-      "note": "",
+      "note": "AWS 를 쓰지 않기로 함(2026-10-08 사용자 결정). 로컬 스케줄 방식은 Task 7 뒤에 다시 정한다",
       "commit": null
     }
   ]
