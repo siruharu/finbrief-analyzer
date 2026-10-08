@@ -4,7 +4,7 @@
     {
       "id": 1,
       "title": "PoC: 대량 일봉 조회·종목군 걸러 내기·어긋남 감지·관심 종목 선정",
-      "status": "todo",
+      "status": "doing",
       "after": [],
       "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-08_screening-poc.md').read_text(encoding='utf-8');assert all(k in t for k in ['yf.download', 'StockListing', '거래대금', '관심 종목', '수정주가'])\"",
       "note": "",

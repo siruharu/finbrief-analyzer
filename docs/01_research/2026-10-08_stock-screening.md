@@ -12,6 +12,10 @@ next: analysis
 
 > **핵심 질문** — 개인 PC 에서 무료 데이터만으로 국내·미국 개별 종목을 매일 스크리닝(관심 종목 시세, 단기 가격·거래량 규칙, 장기 재무 팩터)하려면 어떤 데이터 출처와 방법이 있고, 각각의 한도·제약은 무엇인가?
 
+> **정정 (2026-10-08)** — 아래 "`StockListing('KRX')` 한 번에 2,872종목의 종가·거래량·시가총액이 온다"는 서술은 **틀렸다.**
+> 행 수와 열 이름만 확인했고 값을 보지 않았다. 실제로는 `Close` 가 전부 `"-"`, `Volume`·`Amount`·`Marcap` 이 전부 NaN 이다.
+> 대체 경로와 근거는 [screening-poc](2026-10-08_screening-poc.md).
+
 ## 배경
 사용자가 첫 브리핑 메일을 받은 뒤(2026-10-08) 지수·금리 외에 개별 종목 정보를 원했다: 국내·미국 단일 종목, "장기적으로 추천할 만한 종목", "단타 칠 만한 것", 퀀트 분석.
 조건: 개인 PC 에서 실행(AWS 미사용, 2026-10-08 결정), 무료 데이터, 수신자는 본인과 지인 10명 이하, 무료 발송.
@@ -42,7 +46,7 @@ next: analysis
 
 ### 1. 종목 목록
 - **FinanceDataReader 0.9.202** (2026-05-13 릴리스, MIT)
-  - ✅ `StockListing('KRX')` 한 번(0.3초)에 2,872종목: Code, Name, Market, Close, Open, High, Low, Volume, Amount, Marcap, Stocks 등. `'KOSPI'` 942종목, `'KOSDAQ'` 1,823종목. (2026-10-08 실행)
+  - ⚠️ (정정됨 — 값이 비어 온다) `StockListing('KRX')` 한 번(0.3초)에 2,872행, 열 이름은 Code, Name, Market, Close, Open, High, Low, Volume, Amount, Marcap, Stocks 등. `'KOSPI'` 942종목, `'KOSDAQ'` 1,823종목. (2026-10-08 실행)
   - ✅ `StockListing('S&P500')` 503종목(Symbol, Name, Sector, Industry). `'NASDAQ'` 3,996종목(7.8초). 미국 목록에는 가격이 없다.
   - S&P 500 목록은 Wikipedia, NASDAQ·NYSE·AMEX 목록은 Naver 에서 읽는다. Nasdaq 100 전용 인자는 없다.
   - KRX 목록의 출처는 data.krx.co.kr. 코드에 로그인 처리·폴백 없음.
