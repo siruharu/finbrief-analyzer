@@ -13,13 +13,13 @@
     {
       "id": 2,
       "title": "의존성(anthropic)과 요약 설정",
-      "status": "todo",
+      "status": "done",
       "after": [
         1
       ],
       "verify": "uv run pytest tests/test_config.py && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "163d2db"
     },
     {
       "id": 3,
