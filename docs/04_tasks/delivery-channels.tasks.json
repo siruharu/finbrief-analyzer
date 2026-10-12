@@ -102,13 +102,13 @@
     {
       "id": 10,
       "title": "이미 전원이 받은 날은 수집을 건너뛴다 (선택)",
-      "status": "todo",
+      "status": "done",
       "after": [
         7
       ],
       "verify": "uv run pytest tests/jobs tests/deliver && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "docs/04_tasks/2026-10-12_local-schedule.md Task 10. 스케줄 결정의 선행 조건 아님",
-      "commit": null
+      "commit": "f9d9d53"
     }
   ]
 }
