@@ -21,6 +21,7 @@ from finbrief_analyzer.compose.simple import compose_simple
 from finbrief_analyzer.core.config import Settings, get_settings
 from finbrief_analyzer.core.db import make_engine, session_scope
 from finbrief_analyzer.deliver.dispatch import DispatchResult, dispatch
+from finbrief_analyzer.deliver.models import Channel
 from finbrief_analyzer.deliver.ports import Notifier
 from finbrief_analyzer.deliver.smtp import SmtpNotifier
 from finbrief_analyzer.screen.service import build_screen_service
@@ -52,13 +53,18 @@ def briefing_date(slot: Slot, now: datetime) -> date:
 
 
 def run(slot: Slot, now: datetime, deps: JobDeps) -> DispatchResult:
-    snapshot = deps.collect(slot, now)
-    briefing = compose_simple(snapshot, briefing_date(slot, now))
-    result = dispatch(briefing, deps.recipients(), deps.notifier, deps.log, deps.operator_email)
+    day = briefing_date(slot, now)
+    recipients = deps.recipients()
+    if not deps.log.waiting(day, slot, Channel.EMAIL, [r.id for r in recipients]):
+        # Everyone already has it (or another run is on it): no collection, no outside calls.
+        result = DispatchResult(skipped=len(recipients))
+    else:
+        briefing = compose_simple(deps.collect(slot, now), day)
+        result = dispatch(briefing, recipients, deps.notifier, deps.log, deps.operator_email)
     logger.info(
         "briefing %s %s: sent=%d skipped=%d failed=%d aborted=%s %s",
         slot.value,
-        briefing.briefing_date.isoformat(),
+        day.isoformat(),
         result.sent,
         result.skipped,
         result.failed,

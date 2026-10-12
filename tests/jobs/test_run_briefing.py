@@ -11,9 +11,9 @@ from sqlalchemy import Engine
 from finbrief_analyzer.collect.models import Market, MarketSnapshot, NewsItem, Quote, Slot
 from finbrief_analyzer.core.config import Settings
 from finbrief_analyzer.core.db import session_scope
-from finbrief_analyzer.deliver.models import DeliveryError, RenderedEmail
+from finbrief_analyzer.deliver.models import Channel, DeliveryError, RenderedEmail
 from finbrief_analyzer.jobs.run_briefing import JobDeps, briefing_date, main, open_deps, run
-from finbrief_analyzer.store.delivery_log import DeliveryLog
+from finbrief_analyzer.store.delivery_log import DeliveryKey, DeliveryLog
 from finbrief_analyzer.store.recipients import Recipient, list_active
 
 # 2026-10-08 00:00 UTC = 09:00 in Seoul, 20:00 the evening before in New York.
@@ -113,6 +113,52 @@ def test_sent_mail_contains_the_quotes_and_the_news_link(
     assert "2026-10-08" in email.subject
     assert "S&P 500 7,818.93 (+0.99%)" in email.text
     assert "https://example.com/1" in email.text
+
+
+def test_second_run_of_the_day_does_not_collect_when_everyone_already_has_it(
+    deps: Callable[..., JobDeps], notifier: FakeNotifier
+) -> None:
+    # given: a first run that sent to everyone, and a collector that counts its calls
+    job_deps = deps()
+    calls = 0
+
+    def counting(slot: Slot, now: datetime) -> MarketSnapshot:
+        nonlocal calls
+        calls += 1
+        return job_deps.collect(slot, now)
+
+    counted = JobDeps(counting, job_deps.recipients, notifier, job_deps.log)
+    run(Slot.KR_OPEN, NOW, counted)
+
+    # when
+    result = run(Slot.KR_OPEN, NOW, counted)
+
+    # then: no second collection (no outside calls), nothing sent, everyone reported as skipped
+    assert calls == 1
+    assert len(notifier.delivered) == 2
+    assert result.skipped == 2
+    assert result.sent == 0
+
+
+def test_run_collects_again_while_one_recipient_still_waits(
+    store: Engine, deps: Callable[..., JobDeps], notifier: FakeNotifier
+) -> None:
+    # given: the first recipient got today's briefing, the second one's attempt failed
+    job_deps = deps()
+    with session_scope(store) as session:
+        first, second = list_active(session)
+    log = job_deps.log
+    for recipient in (first, second):
+        log.claim(DeliveryKey(date(2026, 10, 8), Slot.KR_OPEN, recipient.id, Channel.EMAIL))
+    log.mark_sent(DeliveryKey(date(2026, 10, 8), Slot.KR_OPEN, first.id, Channel.EMAIL))
+    log.mark_failed(DeliveryKey(date(2026, 10, 8), Slot.KR_OPEN, second.id, Channel.EMAIL), "x")
+
+    # when
+    result = run(Slot.KR_OPEN, NOW, job_deps)
+
+    # then: collected and sent to the one who was waiting only
+    assert [address for address, _ in notifier.delivered] == ["second@example.com"]
+    assert (result.sent, result.skipped) == (1, 1)
 
 
 def test_briefing_is_still_sent_when_the_reported_market_was_closed(
