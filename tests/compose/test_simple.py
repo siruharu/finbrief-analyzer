@@ -1,9 +1,10 @@
 from datetime import UTC, date, datetime, timedelta
 
 from finbrief_analyzer.collect.models import Market, MarketSnapshot, NewsItem, Quote, Slot
-from finbrief_analyzer.compose.simple import MAX_NEWS_ITEMS, compose_simple
+from finbrief_analyzer.compose.simple import MAX_NEWS_ITEMS, SUMMARY_FALLBACK_NOTE, compose_simple
 from finbrief_analyzer.deliver.models import Briefing, Section
 from finbrief_analyzer.screen.models import Exchange, Rule, ScreenHit, ScreenResult
+from finbrief_analyzer.summarize.models import DigestItem, NewsDigest
 
 DAY = date(2026, 10, 8)
 AS_OF = date(2026, 10, 7)
@@ -218,6 +219,74 @@ def test_news_lists_title_link_and_source_without_the_summary_text() -> None:
     assert (item.title, item.url, item.source) == ("기사 1", "https://example.com/1", "연합뉴스")
     assert news.lines == ()
     assert news.required is False
+
+
+def test_digest_puts_a_summary_line_per_item_with_the_source_and_the_link_in_the_same_order() -> (
+    None
+):
+    # given: the model chose items 3 and 1, newest-first order is not kept
+    items = (_news(1), _news(2), _news(3))
+    digest = NewsDigest(
+        (DigestItem(items[2], "셋째 기사의 핵심"), DigestItem(items[0], "첫째 기사의 핵심")),
+        model="claude-opus-5-5",
+    )
+
+    # when
+    news = _section(compose_simple(_snapshot(news=items), DAY, digest=digest), "뉴스")
+
+    # then
+    assert news.lines == ("셋째 기사의 핵심 (연합뉴스)", "첫째 기사의 핵심 (연합뉴스)")
+    assert [link.url for link in news.links] == ["https://example.com/3", "https://example.com/1"]
+    assert news.required is False
+
+
+def test_without_a_digest_the_news_section_is_the_plain_list() -> None:
+    # given
+    items = (_news(1), _news(2))
+
+    # when
+    plain = _section(compose_simple(_snapshot(news=items), DAY), "뉴스")
+    explicit = _section(compose_simple(_snapshot(news=items), DAY, digest=None), "뉴스")
+
+    # then
+    assert plain == explicit
+    assert plain.lines == ()
+    assert [link.title for link in plain.links] == ["기사 1", "기사 2"]
+
+
+def test_failed_summary_explains_itself_before_the_plain_list() -> None:
+    # given: summaries were switched on but nothing came back
+    items = (_news(1),)
+
+    # when
+    news = _section(
+        compose_simple(_snapshot(news=items), DAY, digest=None, summary_expected=True), "뉴스"
+    )
+
+    # then
+    assert news.lines == (SUMMARY_FALLBACK_NOTE,)
+    assert [link.title for link in news.links] == ["기사 1"]
+
+
+def test_failed_summary_note_is_not_added_when_there_was_no_news_to_summarise() -> None:
+    # given / when
+    news = _section(compose_simple(_snapshot(news=()), DAY, summary_expected=True), "뉴스")
+
+    # then
+    assert news.lines == ()
+    assert news.links == ()
+
+
+def test_digest_is_not_capped_by_the_plain_list_limit() -> None:
+    # given: more picks than the plain list would show
+    items = tuple(_news(index) for index in range(MAX_NEWS_ITEMS + 2))
+    digest = NewsDigest(tuple(DigestItem(item, f"요약 {item.title}") for item in items), "m")
+
+    # when
+    news = _section(compose_simple(_snapshot(news=items), DAY, digest=digest), "뉴스")
+
+    # then
+    assert len(news.lines) == MAX_NEWS_ITEMS + 2
 
 
 def test_news_is_capped_keeping_the_newest_items() -> None:

@@ -1,4 +1,4 @@
-"""Composer v0: lay the snapshot out as it is. No selection, no summarising."""
+"""Composer v0: lay the snapshot out as it is. Selection and summaries come in as a digest."""
 
 from collections.abc import Sequence
 from datetime import date
@@ -6,9 +6,11 @@ from datetime import date
 from finbrief_analyzer.collect.models import Market, MarketSnapshot, NewsItem, Quote, Slot
 from finbrief_analyzer.deliver.models import Briefing, LinkItem, Section
 from finbrief_analyzer.screen.models import Exchange, Rule, ScreenHit, ScreenResult
+from finbrief_analyzer.summarize.models import NewsDigest
 
-# Newest first. Choosing which items matter is the summarising step's job, which does not exist yet.
+# Plain list, newest first: what the reader gets when there is no digest.
 MAX_NEWS_ITEMS = 10
+SUMMARY_FALLBACK_NOTE = "자동 요약을 만들지 못해 최신 기사 순으로 싣습니다."
 MARKET_LABELS = {Market.KR: "국내", Market.US: "미국"}
 GROUP_TITLES: dict[Market | None, str] = {
     Market.KR: "국내 증시",
@@ -40,12 +42,23 @@ DISCLAIMER = (
 )
 
 
-def compose_simple(snapshot: MarketSnapshot, briefing_date: date) -> Briefing:
+def compose_simple(
+    snapshot: MarketSnapshot,
+    briefing_date: date,
+    digest: NewsDigest | None = None,
+    summary_expected: bool = False,
+) -> Briefing:
+    """Lay the snapshot out. With a digest, the news section carries its lines and links.
+
+    `summary_expected` says summaries were switched on; without a digest the reader is told
+    the list is the plain one.
+    """
     screens = _screen_sections(snapshot.screens)
+    news = _news_section(snapshot.news, digest, summary_expected)
     return Briefing(
         slot=snapshot.slot,
         briefing_date=briefing_date,
-        sections=(*_quote_sections(snapshot), *screens, _news_section(snapshot.news)),
+        sections=(*_quote_sections(snapshot), *screens, news),
         notices=_notices(snapshot),
         footnotes=(DISCLAIMER,) if screens else (),
     )
@@ -125,12 +138,19 @@ def _digits(quote: Quote) -> int:
     return 4 if abs(quote.close) < 10 else 2
 
 
-def _news_section(items: Sequence[NewsItem]) -> Section:
-    links = tuple(
-        LinkItem(title=item.title, url=item.link, source=item.source)
-        for item in items[:MAX_NEWS_ITEMS]
-    )
-    return Section(title="뉴스", links=links)
+def _news_section(
+    items: Sequence[NewsItem], digest: NewsDigest | None, summary_expected: bool
+) -> Section:
+    if digest is not None and digest.items:
+        # The model's order, and as many as it chose: the count is a setting, not this cap.
+        lines = tuple(f"{entry.line} ({entry.news.source})" for entry in digest.items)
+        return Section(title="뉴스", lines=lines, links=tuple(_link(e.news) for e in digest.items))
+    note = (SUMMARY_FALLBACK_NOTE,) if summary_expected and items else ()
+    return Section(title="뉴스", lines=note, links=tuple(map(_link, items[:MAX_NEWS_ITEMS])))
+
+
+def _link(item: NewsItem) -> LinkItem:
+    return LinkItem(title=item.title, url=item.link, source=item.source)
 
 
 def _notices(snapshot: MarketSnapshot) -> tuple[str, ...]:

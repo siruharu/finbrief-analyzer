@@ -1,6 +1,7 @@
 """Application settings loaded from environment variables / .env."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -99,6 +100,18 @@ class Settings(BaseSettings):
     watchlist: tuple[QuoteSymbol, ...] = DEFAULT_WATCHLIST
     kr_rss_feeds: tuple[str, ...] = DEFAULT_KR_RSS_FEEDS
 
+    # News selection and one-line summaries through the Claude API. No key: the briefing
+    # lists the newest items as before. Defaults are the PoC outcome
+    # (docs/01_research/2026-10-12_news-summary-poc.md).
+    anthropic_api_key: SecretStr | None = None
+    summary_model: str = "claude-opus-5-5"
+    summary_effort: Literal["low", "medium", "high"] = "low"
+    # How many news items the briefing carries when summaries are on.
+    summary_picks: int = Field(default=7, ge=1, le=20)
+    # Observed maximum was 1,200 output tokens including thinking.
+    summary_max_tokens: int = Field(default=2000, ge=256)
+    summary_timeout_seconds: float = Field(default=120.0, gt=0)
+
     # Marketaux free plan: 3 articles per request, 100 requests a day, two slots a day.
     marketaux_max_calls_per_slot: int = Field(default=3, ge=1, le=50)
     # Marketaux timed out at 15s in the PoC, and a timed-out request still costs quota.
@@ -145,7 +158,7 @@ class Settings(BaseSettings):
     operator_email: str | None = None
 
     @field_validator(
-        "marketaux_token", "dart_api_key", "ecos_api_key",
+        "marketaux_token", "dart_api_key", "ecos_api_key", "anthropic_api_key",
         "db_host", "db_name", "db_user", "db_password",
         "smtp_user", "smtp_password", "operator_email",
         mode="before",

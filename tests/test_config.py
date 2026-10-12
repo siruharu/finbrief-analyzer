@@ -12,7 +12,8 @@ from finbrief_analyzer.screen.models import Exchange
 def _isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     # Settings reads ".env" relative to the working directory; keep the developer's file out.
     monkeypatch.chdir(tmp_path)
-    for key in ("APP_MARKETAUX_TOKEN", "APP_DART_API_KEY", "APP_ECOS_API_KEY"):
+    keys = ("APP_MARKETAUX_TOKEN", "APP_DART_API_KEY", "APP_ECOS_API_KEY", "APP_ANTHROPIC_API_KEY")
+    for key in keys:
         monkeypatch.delenv(key, raising=False)
 
 
@@ -153,6 +154,60 @@ def test_all_symbols_lists_the_indices_first_and_the_watchlist_after() -> None:
 
     # then: one list, so everything is collected in a single request batch
     assert symbols == (*settings.quote_symbols, *settings.watchlist)
+
+
+def test_anthropic_key_is_a_secret_hidden_from_repr(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
+    monkeypatch.setenv("APP_ANTHROPIC_API_KEY", "sk-ant-very-secret")
+
+    # when
+    settings = Settings()
+
+    # then
+    assert isinstance(settings.anthropic_api_key, SecretStr)
+    assert settings.anthropic_api_key.get_secret_value() == "sk-ant-very-secret"
+    assert "sk-ant-very-secret" not in repr(settings)
+
+
+def test_blank_anthropic_key_means_summaries_are_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given: the key line exists in .env but is empty
+    monkeypatch.setenv("APP_ANTHROPIC_API_KEY", "   ")
+
+    # when / then
+    assert Settings().anthropic_api_key is None
+
+
+def test_summary_defaults_are_the_poc_outcome() -> None:
+    # given / when
+    settings = Settings()
+
+    # then: docs/01_research/2026-10-12_news-summary-poc.md "확정값"
+    assert settings.summary_model == "claude-opus-5-5"
+    assert settings.summary_effort == "low"
+    assert settings.summary_picks == 7
+    assert settings.summary_max_tokens == 2000
+    assert settings.summary_timeout_seconds == 120.0
+
+
+@pytest.mark.parametrize("picks", ["0", "21"])
+def test_summary_picks_outside_one_to_twenty_is_rejected(
+    monkeypatch: pytest.MonkeyPatch, picks: str
+) -> None:
+    # given
+    monkeypatch.setenv("APP_SUMMARY_PICKS", picks)
+
+    # when / then
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_summary_effort_accepts_only_known_levels(monkeypatch: pytest.MonkeyPatch) -> None:
+    # given
+    monkeypatch.setenv("APP_SUMMARY_EFFORT", "turbo")
+
+    # when / then
+    with pytest.raises(ValidationError):
+        Settings()
 
 
 def test_universe_sizes_default_to_200_kospi_and_150_kosdaq() -> None:
