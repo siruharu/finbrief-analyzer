@@ -4,7 +4,7 @@
     {
       "id": 1,
       "title": "PoC: 실제 하루치 뉴스로 모델·effort 비교, 확정값 기록",
-      "status": "todo",
+      "status": "doing",
       "after": [],
       "verify": "python -c \"import pathlib;t=pathlib.Path('docs/01_research/2026-10-12_news-summary-poc.md').read_text(encoding='utf-8');assert all(k in t for k in ['claude-opus-5-5','claude-haiku-5-5','usage','확정'])\"",
       "note": "",
