@@ -19,7 +19,9 @@ KST = timezone(timedelta(hours=9))
 EVENING = datetime(2026, 10, 8, 20, 0, tzinfo=KST)
 # At 11:00 KST the Korean market is open: the last completed session is the 7th.
 MORNING = datetime(2026, 10, 8, 11, 0, tzinfo=KST)
-D5, D6, D7, D8 = (date(2026, 10, day) for day in (5, 6, 7, 8))
+D5, D6, D7, D8, D12 = (date(2026, 10, day) for day in (5, 6, 7, 8, 12))
+# Monday after a holiday Friday (the 9th); at 11:00 the market is open.
+MONDAY = datetime(2026, 10, 12, 11, 0, tzinfo=KST)
 SAMSUNG = "005930"
 
 
@@ -32,16 +34,29 @@ def rank(code: str, day: date, close: float, prev_close: float) -> RankRow:
 
 
 class Ranking:
-    def __init__(self, rows: Sequence[RankRow] = (), error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        rows: Sequence[RankRow] = (),
+        error: Exception | None = None,
+        days: Sequence[date] = (),
+        days_error: Exception | None = None,
+    ) -> None:
         self.calls = 0
         self._rows = list(rows)
         self._error = error
+        self._days = list(days)
+        self._days_error = days_error
 
     def fetch(self, exchange: Exchange, pages: int) -> list[RankRow]:
         self.calls += 1
         if self._error is not None:
             raise self._error
         return self._rows
+
+    def trading_days(self, exchange: Exchange, count: int = 5) -> list[date]:
+        if self._days_error is not None:
+            raise self._days_error
+        return self._days
 
 
 class KrHistory:
@@ -165,6 +180,70 @@ def test_kr_ranking_row_of_a_session_in_progress_is_not_appended(kr: Engine) -> 
     assert _stored(kr, SAMSUNG) == [(D7, 100.0)]
     assert source.asked == []
     assert report == UpdateReport()
+
+
+def test_kr_holiday_before_a_session_in_progress_does_not_reload(kr: Engine) -> None:
+    # given: Friday the 9th was a holiday; stored up to Thursday; Monday 11:00 the market is open
+    _seed(kr, bar(SAMSUNG, D8, close=100.0))
+    ranking = Ranking(
+        [rank(SAMSUNG, D12, close=103.0, prev_close=100.0)], days=[D12, D8, D7, D6, D5]
+    )
+    source = KrHistory()
+
+    # when
+    report = _run(kr, MONDAY, ranking=ranking, kr_history=source)
+
+    # then: the index says the 8th was the last session, so nothing was missed
+    assert source.asked == []
+    assert _stored(kr, SAMSUNG) == [(D8, 100.0)]
+    assert report == UpdateReport()
+
+
+def test_kr_session_missed_before_the_one_in_progress_is_loaded_again(kr: Engine) -> None:
+    # given: stored up to Wednesday; the index traded Thursday too; Monday 11:00 the market is open
+    _seed(kr, bar(SAMSUNG, D7, close=100.0))
+    ranking = Ranking([rank(SAMSUNG, D12, close=112.0, prev_close=110.0)], days=[D12, D8, D7])
+    source = KrHistory([bar(SAMSUNG, D7), bar(SAMSUNG, D8, close=110.0)])
+
+    # when
+    report = _run(kr, MONDAY, ranking=ranking, kr_history=source)
+
+    # then: a completed session is missing, so the history is loaded again whole
+    assert [symbol for symbol, _ in source.asked] == [SAMSUNG]
+    assert _stored(kr, SAMSUNG) == [(D7, 100.0), (D8, 110.0)]
+    assert report.reloaded == 1
+
+
+def test_kr_falls_back_to_the_calendar_when_the_index_is_down(kr: Engine) -> None:
+    # given: stored up to Thursday, the index endpoint fails, Monday 11:00
+    _seed(kr, bar(SAMSUNG, D8, close=100.0))
+    ranking = Ranking(
+        [rank(SAMSUNG, D12, close=103.0, prev_close=100.0)],
+        days_error=CollectError("naver-ranking", "down"),
+    )
+    source = KrHistory([bar(SAMSUNG, D8)])
+
+    # when
+    report = _run(kr, MONDAY, ranking=ranking, kr_history=source)
+
+    # then: the calendar says Friday traded, so the stock is loaded again as before
+    assert [symbol for symbol, _ in source.asked] == [SAMSUNG]
+    assert report.reloaded == 1
+
+
+def test_kr_after_market_reference_price_still_appends(kr: Engine) -> None:
+    # given: stored KRX close 100; Naver's "previous close" is the NXT after-market 103
+    _seed(kr, bar(SAMSUNG, D7, close=100.0))
+    ranking = Ranking([rank(SAMSUNG, D8, close=105.0, prev_close=103.0)], days=[D8, D7])
+    source = KrHistory()
+
+    # when
+    report = _run(kr, EVENING, ranking=ranking, kr_history=source)
+
+    # then: a 3% reference gap is not a split; the day is appended, nothing is reloaded
+    assert source.asked == []
+    assert _stored(kr, SAMSUNG) == [(D7, 100.0), (D8, 105.0)]
+    assert report == UpdateReport(added=1)
 
 
 def test_kr_next_day_is_appended_from_the_ranking_without_a_history_request(kr: Engine) -> None:

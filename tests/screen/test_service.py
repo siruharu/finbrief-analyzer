@@ -176,6 +176,9 @@ class _Ranking:
     def fetch(self, exchange: Exchange, pages: int) -> list[RankRow]:
         return []
 
+    def trading_days(self, exchange: Exchange, count: int = 5) -> list[date]:
+        return []
+
 
 class _KrHistory:
     def __init__(self) -> None:

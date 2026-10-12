@@ -123,6 +123,41 @@ def test_http_error_becomes_a_collect_error() -> None:
         NaverRanking(client).fetch(Exchange.KOSPI, pages=1)
 
 
+def _index(rows: list[dict[str, str]]) -> tuple[NaverRanking, list[httpx.Request]]:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=rows)
+
+    return NaverRanking(httpx.Client(transport=httpx.MockTransport(handler))), seen
+
+
+def test_trading_days_are_the_index_dates_latest_first() -> None:
+    # given: the index rows arrive oldest first, with a holiday Friday missing
+    traded = ("2026-10-07", "2026-10-08", "2026-10-12")
+    ranking, seen = _index([{"localTradedAt": d, "closePrice": "1"} for d in traded])
+
+    # when
+    days = ranking.trading_days(Exchange.KOSDAQ, count=3)
+
+    # then
+    assert days == [date(2026, 10, 12), date(2026, 10, 8), date(2026, 10, 7)]
+    assert seen[0].url.path == "/api/index/KOSDAQ/price"
+    assert seen[0].url.params["pageSize"] == "3"
+
+
+def test_trading_days_failure_becomes_a_collect_error() -> None:
+    # given: an HTML error page with status 200
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, text="<html>"))
+    )
+
+    # when / then
+    with pytest.raises(CollectError, match="trading days"):
+        NaverRanking(client).trading_days(Exchange.KOSPI)
+
+
 def test_unexpected_body_becomes_a_collect_error() -> None:
     # given: an HTML error page with status 200
     client = httpx.Client(
