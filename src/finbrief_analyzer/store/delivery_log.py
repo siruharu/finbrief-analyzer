@@ -1,10 +1,11 @@
 """Delivery records. `claim` is what keeps a briefing from being sent twice."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Self
 
-from sqlalchemy import ColumnElement, Engine, and_, update
+from sqlalchemy import ColumnElement, Engine, and_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -13,7 +14,15 @@ from finbrief_analyzer.core.db import session_scope
 from finbrief_analyzer.deliver.models import Briefing, Channel, DeliveryStatus
 from finbrief_analyzer.store.tables import REASON_MAX_LENGTH, delivery_log
 
-__all__ = ["REASON_MAX_LENGTH", "DeliveryKey", "DeliveryLog", "claim", "mark_failed", "mark_sent"]
+__all__ = [
+    "REASON_MAX_LENGTH",
+    "DeliveryKey",
+    "DeliveryLog",
+    "claim",
+    "mark_failed",
+    "mark_sent",
+    "waiting",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +98,33 @@ def mark_failed(session: Session, key: DeliveryKey, reason: str) -> None:
     )
 
 
+def waiting(
+    session: Session,
+    brief_date: date,
+    slot: Slot,
+    channel: Channel,
+    recipient_ids: Sequence[int],
+) -> list[int]:
+    """The recipients a run could still claim: no row yet, or the last attempt failed.
+
+    Mirrors `claim`: a pending row counts as taken, so this never says "waiting" for someone
+    another process is sending to right now.
+    """
+    if not recipient_ids:
+        return []
+    taken = session.execute(
+        select(delivery_log.c.recipient_id).where(
+            delivery_log.c.brief_date == brief_date,
+            delivery_log.c.slot == slot.value,
+            delivery_log.c.channel == channel.value,
+            delivery_log.c.recipient_id.in_(recipient_ids),
+            delivery_log.c.status != DeliveryStatus.FAILED.value,
+        )
+    )
+    done = {row.recipient_id for row in taken}
+    return [recipient_id for recipient_id in recipient_ids if recipient_id not in done]
+
+
 class DeliveryLog:
     """The log bound to an engine. Every call is its own committed transaction.
 
@@ -101,6 +137,12 @@ class DeliveryLog:
     def claim(self, key: DeliveryKey) -> bool:
         with session_scope(self._engine) as session:
             return claim(session, key)
+
+    def waiting(
+        self, brief_date: date, slot: Slot, channel: Channel, recipient_ids: Sequence[int]
+    ) -> list[int]:
+        with session_scope(self._engine) as session:
+            return waiting(session, brief_date, slot, channel, recipient_ids)
 
     def mark_sent(self, key: DeliveryKey) -> None:
         with session_scope(self._engine) as session:

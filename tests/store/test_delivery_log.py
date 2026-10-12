@@ -16,6 +16,7 @@ from finbrief_analyzer.store.delivery_log import (
     claim,
     mark_failed,
     mark_sent,
+    waiting,
 )
 from finbrief_analyzer.store.tables import delivery_log, metadata
 
@@ -169,6 +170,36 @@ def test_mark_failed_cuts_an_overlong_reason(store: Engine, key: DeliveryKey) ->
     reason = _rows(store)[0][1]
     assert reason is not None
     assert len(reason) == REASON_MAX_LENGTH
+
+
+def test_waiting_lists_unclaimed_and_failed_recipients_but_not_sent_or_pending(
+    store: Engine, add_recipient: Callable[..., int]
+) -> None:
+    # given: four recipients — sent, failed, pending (another process), and never claimed
+    sent, failed, pending, fresh = (add_recipient(f"{n}@example.com") for n in "abcd")
+    with session_scope(store) as session:
+        for recipient_id in (sent, failed, pending):
+            claim(session, DeliveryKey(DAY, Slot.KR_OPEN, recipient_id, Channel.EMAIL))
+        mark_sent(session, DeliveryKey(DAY, Slot.KR_OPEN, sent, Channel.EMAIL))
+        mark_failed(session, DeliveryKey(DAY, Slot.KR_OPEN, failed, Channel.EMAIL), "x")
+
+    # when
+    with session_scope(store) as session:
+        result = waiting(session, DAY, Slot.KR_OPEN, Channel.EMAIL, [sent, failed, pending, fresh])
+        other_slot = waiting(session, DAY, Slot.US_OPEN, Channel.EMAIL, [sent])
+
+    # then: the same people `claim` would accept, in the order given; other slots are untouched
+    assert result == [failed, fresh]
+    assert other_slot == [sent]
+
+
+def test_waiting_with_no_recipients_is_empty_without_touching_the_database(store: Engine) -> None:
+    # given / when
+    with session_scope(store) as session:
+        result = waiting(session, DAY, Slot.KR_OPEN, Channel.EMAIL, [])
+
+    # then
+    assert result == []
 
 
 def test_migration_downgrade_then_upgrade_gives_the_same_schema(tmp_path: Path) -> None:
