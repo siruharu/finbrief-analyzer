@@ -57,14 +57,14 @@
     {
       "id": 6,
       "title": "작업 연결: collect → summarize → compose, 실패 시 v0",
-      "status": "todo",
+      "status": "done",
       "after": [
         4,
         5
       ],
       "verify": "uv run pytest tests/jobs && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "09d5869"
     },
     {
       "id": 7,
