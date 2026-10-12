@@ -28,12 +28,18 @@ logger = logging.getLogger(__name__)
 KR_EXCHANGES = (Exchange.KOSPI, Exchange.KOSDAQ)
 # Relative difference beyond which stored and fetched closes are "not the same price".
 TOLERANCE = 0.005
+# Naver's "previous close" is the reference price of the integrated session (KRX plus the
+# NXT after-market), which may sit up to 10% away from the KRX close that is stored. Only a
+# split or a large adjustment moves it further than this.
+REFERENCE_TOLERANCE = 0.15
 # A longer silence than a long weekend means days were missed, not that nothing traded.
 MAX_GAP_DAYS = 4
 
 
 class RankingSource(Protocol):
     def fetch(self, exchange: Exchange, pages: int) -> list[RankRow]: ...
+
+    def trading_days(self, exchange: Exchange, count: int = 5) -> list[date]: ...
 
 
 class HistorySource(Protocol):
@@ -76,8 +82,8 @@ class _Tally:
         )
 
 
-def differs(stored: float, fetched: float) -> bool:
-    return abs(stored - fetched) > TOLERANCE * max(abs(stored), abs(fetched))
+def differs(stored: float, fetched: float, tolerance: float = TOLERANCE) -> bool:
+    return abs(stored - fetched) > tolerance * max(abs(stored), abs(fetched))
 
 
 def update_history(
@@ -115,7 +121,7 @@ def _update_kr(
     tally: _Tally,
     expired: Callable[[], bool],
 ) -> None:
-    settled = expected_session(Market.KR, now)
+    settled = _kr_settled(sources.ranking, now)
     symbols = [member.symbol for member in universe]
     with session_scope(engine) as session:
         stored = last_bars(session, symbols)
@@ -130,6 +136,23 @@ def _update_kr(
             tally.skipped += 1
         else:
             _load_kr(engine, symbol, sources.kr_history, since, settled, last is not None, tally)
+
+
+def _kr_settled(ranking: RankingSource, now: datetime) -> date:
+    """The last completed Korean session.
+
+    The calendar gives a weekday that may be a holiday; the index's own trading days say
+    which weekdays actually traded. Without them, every stock would look stale on the day
+    after a holiday and be loaded again whole.
+    """
+    guess = expected_session(Market.KR, now)
+    try:
+        days = ranking.trading_days(Exchange.KOSPI)
+    except CollectError as error:
+        logger.warning("trading days unavailable, assuming %s traded: %s", guess, error)
+        return guess
+    traded = [day for day in days if day <= guess]
+    return max(traded) if traded else guess
 
 
 def _settled_rows(
@@ -152,7 +175,8 @@ def _settled_rows(
 def _continues(last: Bar, row: RankRow) -> bool:
     """Whether the ranking row is simply the next day after what is stored."""
     gap = (row.traded_on - last.day).days
-    return 0 < gap <= MAX_GAP_DAYS and not differs(last.close, row.prev_close)
+    same_reference = not differs(last.close, row.prev_close, REFERENCE_TOLERANCE)
+    return 0 < gap <= MAX_GAP_DAYS and same_reference
 
 
 def _load_kr(

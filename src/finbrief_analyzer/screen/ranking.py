@@ -17,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 SOURCE = "naver-ranking"
 URL = "https://m.stock.naver.com/api/stocks/marketValue/{exchange}"
+# Daily rows of the exchange's index: the dates are the days the exchange actually traded.
+INDEX_URL = "https://m.stock.naver.com/api/index/{exchange}/price"
 PAGE_SIZE = 100
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 EXCHANGE_CODES = {Exchange.KOSPI: "KOSPI", Exchange.KOSDAQ: "KOSDAQ"}
@@ -70,6 +72,18 @@ class NaverRanking:
                 by_code.setdefault(parsed.code, parsed)
         # The endpoint is close to sorted, not strictly sorted.
         return sorted(by_code.values(), key=lambda row: (-row.market_value, row.code))
+
+    def trading_days(self, exchange: Exchange, count: int = 5) -> list[date]:
+        """The most recent days the exchange traded, latest first; a session in progress counts."""
+        url = INDEX_URL.format(exchange=EXCHANGE_CODES[exchange])
+        try:
+            response = self._client.get(url, params={"page": 1, "pageSize": count}, headers=HEADERS)
+            response.raise_for_status()
+            days = [date.fromisoformat(row["localTradedAt"]) for row in response.json()]
+        except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
+            detail = f"{exchange.value} trading days: {type(error).__name__}"
+            raise CollectError(SOURCE, detail) from error
+        return sorted(days, reverse=True)
 
     def _page(self, exchange: Exchange, page: int) -> list[dict[str, str]]:
         url = URL.format(exchange=EXCHANGE_CODES[exchange])
