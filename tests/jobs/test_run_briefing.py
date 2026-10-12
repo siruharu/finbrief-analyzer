@@ -1,20 +1,25 @@
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import SecretStr
 from sqlalchemy import Engine
 
 from finbrief_analyzer.collect.models import Market, MarketSnapshot, NewsItem, Quote, Slot
+from finbrief_analyzer.compose.simple import SUMMARY_FALLBACK_NOTE
 from finbrief_analyzer.core.config import Settings
 from finbrief_analyzer.core.db import session_scope
 from finbrief_analyzer.deliver.models import Channel, DeliveryError, RenderedEmail
 from finbrief_analyzer.jobs.run_briefing import JobDeps, briefing_date, main, open_deps, run
 from finbrief_analyzer.store.delivery_log import DeliveryKey, DeliveryLog
 from finbrief_analyzer.store.recipients import Recipient, list_active
+from finbrief_analyzer.summarize.claude import ClaudeSummarizer
+from finbrief_analyzer.summarize.models import DigestItem, NewsDigest
+from finbrief_analyzer.summarize.ports import Summarizer
 
 # 2026-10-08 00:00 UTC = 09:00 in Seoul, 20:00 the evening before in New York.
 NOW = datetime(2026, 10, 8, 0, 0, tzinfo=UTC)
@@ -49,7 +54,9 @@ def deps(
     add_recipient("first@example.com")
     add_recipient("second@example.com")
 
-    def build(snapshot: MarketSnapshot | None = None) -> JobDeps:
+    def build(
+        snapshot: MarketSnapshot | None = None, summarize: Summarizer | None = None
+    ) -> JobDeps:
         fixed = snapshot or MarketSnapshot(Slot.KR_OPEN, quotes=(SP500,), news=(NEWS,))
 
         def recipients() -> list[Recipient]:
@@ -61,9 +68,30 @@ def deps(
             recipients=recipients,
             notifier=notifier,
             log=DeliveryLog(store),
+            summarize=summarize,
         )
 
     return build
+
+
+class FakeSummarizer:
+    """Answers with a fixed digest (or None) and remembers what it was asked."""
+
+    def __init__(self, digest: NewsDigest | None) -> None:
+        self.asked: list[tuple[int, Slot]] = []
+        self._digest = digest
+
+    def summarize(self, news: Sequence[NewsItem], slot: Slot) -> NewsDigest | None:
+        self.asked.append((len(news), slot))
+        return self._digest
+
+
+DIGEST = NewsDigest(
+    (DigestItem(NEWS, "기사의 핵심 한 줄"),),
+    "claude-opus-5-5",
+    input_tokens=6000,
+    output_tokens=400,
+)
 
 
 def _factory(job_deps: JobDeps) -> Callable[[Settings], AbstractContextManager[JobDeps]]:
@@ -159,6 +187,121 @@ def test_run_collects_again_while_one_recipient_still_waits(
     # then: collected and sent to the one who was waiting only
     assert [address for address, _ in notifier.delivered] == ["second@example.com"]
     assert (result.sent, result.skipped) == (1, 1)
+
+
+def test_without_a_summarizer_the_news_is_the_plain_list(
+    deps: Callable[..., JobDeps], notifier: FakeNotifier
+) -> None:
+    # given / when
+    run(Slot.KR_OPEN, NOW, deps(summarize=None))
+
+    # then: the link is there, no summary line and no fallback note
+    text = notifier.delivered[0][1].text
+    assert "https://example.com/1" in text
+    assert SUMMARY_FALLBACK_NOTE not in text
+
+
+def test_digest_lines_and_links_reach_the_mail_and_the_log(
+    deps: Callable[..., JobDeps], notifier: FakeNotifier, caplog: pytest.LogCaptureFixture
+) -> None:
+    # given
+    summarizer = FakeSummarizer(DIGEST)
+
+    # when
+    with caplog.at_level(logging.INFO):
+        run(Slot.KR_OPEN, NOW, deps(summarize=summarizer))
+
+    # then
+    text = notifier.delivered[0][1].text
+    assert "기사의 핵심 한 줄 (연합뉴스)" in text
+    assert "https://example.com/1" in text
+    assert summarizer.asked == [(1, Slot.KR_OPEN)]
+    assert (
+        "summary: picks=1 input_tokens=6000 output_tokens=400 model=claude-opus-5-5" in caplog.text
+    )
+
+
+def test_failed_summary_falls_back_to_the_plain_list_with_a_note_and_a_warning(
+    deps: Callable[..., JobDeps], notifier: FakeNotifier, caplog: pytest.LogCaptureFixture
+) -> None:
+    # given: the summarizer gave up (API error, refusal, nothing usable)
+    summarizer = FakeSummarizer(None)
+
+    # when
+    with caplog.at_level(logging.WARNING):
+        result = run(Slot.KR_OPEN, NOW, deps(summarize=summarizer))
+
+    # then: the mail still goes, with the plain list and an explanation
+    assert result.sent == 2
+    text = notifier.delivered[0][1].text
+    assert SUMMARY_FALLBACK_NOTE in text
+    assert "https://example.com/1" in text
+    assert "summary unavailable" in caplog.text
+
+
+def test_summarizer_is_not_asked_when_there_is_no_news(
+    deps: Callable[..., JobDeps], notifier: FakeNotifier
+) -> None:
+    # given
+    summarizer = FakeSummarizer(DIGEST)
+    snapshot = MarketSnapshot(Slot.KR_OPEN, quotes=(SP500,), news=())
+
+    # when
+    run(Slot.KR_OPEN, NOW, deps(snapshot, summarize=summarizer))
+
+    # then
+    assert summarizer.asked == []
+    assert SUMMARY_FALLBACK_NOTE not in notifier.delivered[0][1].text
+
+
+def test_summarizer_is_not_asked_when_everyone_already_has_the_briefing(
+    deps: Callable[..., JobDeps],
+) -> None:
+    # given: a first run that sent to everyone
+    summarizer = FakeSummarizer(DIGEST)
+    job_deps = deps(summarize=summarizer)
+    run(Slot.KR_OPEN, NOW, job_deps)
+
+    # when
+    run(Slot.KR_OPEN, NOW, job_deps)
+
+    # then: one call, from the first run only
+    assert len(summarizer.asked) == 1
+
+
+def _configured(**overrides: Any) -> Settings:
+    return Settings(
+        smtp_user="sender@gmail.com",
+        smtp_password=SecretStr(SECRET),
+        db_host="localhost",
+        db_name="finbrief",
+        db_user="finbrief",
+        db_password=SecretStr("pw"),
+        **overrides,
+    )
+
+
+def test_open_deps_has_no_summarizer_without_an_anthropic_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("APP_ANTHROPIC_API_KEY", raising=False)
+
+    # when / then: nothing connects until used, so wiring alone is safe to inspect
+    with open_deps(_configured()) as job_deps:
+        assert job_deps.summarize is None
+
+
+def test_open_deps_wires_the_claude_summarizer_when_a_key_is_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given
+    monkeypatch.chdir(tmp_path)
+
+    # when / then
+    with open_deps(_configured(anthropic_api_key=SecretStr("sk-ant-test"))) as job_deps:
+        assert isinstance(job_deps.summarize, ClaudeSummarizer)
 
 
 def test_briefing_is_still_sent_when_the_reported_market_was_closed(

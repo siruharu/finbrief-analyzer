@@ -27,6 +27,9 @@ from finbrief_analyzer.deliver.smtp import SmtpNotifier
 from finbrief_analyzer.screen.service import build_screen_service
 from finbrief_analyzer.store.delivery_log import DeliveryLog
 from finbrief_analyzer.store.recipients import Recipient, list_active
+from finbrief_analyzer.summarize.claude import build_summarizer
+from finbrief_analyzer.summarize.models import NewsDigest
+from finbrief_analyzer.summarize.ports import Summarizer
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +46,8 @@ class JobDeps:
     notifier: Notifier
     log: DeliveryLog
     operator_email: str | None = None
+    # None when no API key is configured: the news stays a plain list.
+    summarize: Summarizer | None = None
 
 
 OpenJob = Callable[[Settings], AbstractContextManager[JobDeps]]
@@ -59,7 +64,10 @@ def run(slot: Slot, now: datetime, deps: JobDeps) -> DispatchResult:
         # Everyone already has it (or another run is on it): no collection, no outside calls.
         result = DispatchResult(skipped=len(recipients))
     else:
-        briefing = compose_simple(deps.collect(slot, now), day)
+        snapshot = deps.collect(slot, now)
+        digest = _summarize(deps.summarize, snapshot, slot)
+        expected = deps.summarize is not None and bool(snapshot.news)
+        briefing = compose_simple(snapshot, day, digest, summary_expected=expected)
         result = dispatch(briefing, recipients, deps.notifier, deps.log, deps.operator_email)
     logger.info(
         "briefing %s %s: sent=%d skipped=%d failed=%d aborted=%s %s",
@@ -72,6 +80,26 @@ def run(slot: Slot, now: datetime, deps: JobDeps) -> DispatchResult:
         result.abort_reason,
     )
     return result
+
+
+def _summarize(
+    summarizer: Summarizer | None, snapshot: MarketSnapshot, slot: Slot
+) -> NewsDigest | None:
+    """Ask for the digest when there is a summarizer and news. A failure warns, never aborts."""
+    if summarizer is None or not snapshot.news:
+        return None
+    digest = summarizer.summarize(snapshot.news, slot)
+    if digest is None:
+        logger.warning("summary unavailable: listing the newest news instead")
+        return None
+    logger.info(
+        "summary: picks=%d input_tokens=%d output_tokens=%d model=%s",
+        len(digest.items),
+        digest.input_tokens,
+        digest.output_tokens,
+        digest.model,
+    )
+    return digest
 
 
 @contextmanager
@@ -100,6 +128,7 @@ def open_deps(settings: Settings) -> Iterator[JobDeps]:
             notifier=notifier,
             log=DeliveryLog(engine),
             operator_email=settings.operator_email,
+            summarize=build_summarizer(settings),
         )
     finally:
         notifier.close()
