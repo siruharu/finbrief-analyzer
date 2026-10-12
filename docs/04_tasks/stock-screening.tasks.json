@@ -122,6 +122,17 @@
       "verify": "uv run pytest tests/screen tests/compose && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
       "commit": "48a8237"
+    },
+    {
+      "id": 12,
+      "title": "국내 공휴일 뒤 장중 실행에서 전 종목을 다시 받지 않기",
+      "status": "done",
+      "after": [
+        6
+      ],
+      "verify": "uv run pytest tests/screen/test_history.py && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "",
+      "commit": "cb8a9eb"
     }
   ]
 }
