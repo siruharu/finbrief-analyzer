@@ -79,13 +79,13 @@
     },
     {
       "id": 8,
-      "title": "인프라: 비밀값, 스케줄, 실패 알람",
-      "status": "blocked",
+      "title": "로컬 스케줄: 런처, 작업 스케줄러 등록, 운영 절차",
+      "status": "doing",
       "after": [
         7
       ],
-      "verify": "terraform -chdir=deploy/terraform/service init -backend=false && terraform -chdir=deploy/terraform/service validate",
-      "note": "AWS 를 쓰지 않기로 함(2026-10-08 사용자 결정). 로컬 스케줄 방식은 Task 7 뒤에 다시 정한다",
+      "verify": "powershell -NoProfile -Command \"if ((Get-ScheduledTask -TaskName finbrief-kr-open,finbrief-us-open -ErrorAction Stop | Measure-Object).Count -ne 2) { exit 1 }\" && findstr /c:\"=== exit 0\" logs\\kr_open.log && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "2026-10-12 로컬 방식으로 재정의 (docs/02_analysis/2026-10-12_local-schedule.md). terraform 판은 폐기",
       "commit": null
     },
     {
@@ -98,6 +98,17 @@
       "verify": "uv run pytest tests/compose tests/collect && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
       "commit": "daf67ef"
+    },
+    {
+      "id": 10,
+      "title": "이미 전원이 받은 날은 수집을 건너뛴다 (선택)",
+      "status": "todo",
+      "after": [
+        7
+      ],
+      "verify": "uv run pytest tests/jobs tests/deliver && uv run ruff check . && uv run mypy && uv run pytest",
+      "note": "docs/04_tasks/2026-10-12_local-schedule.md Task 10. 스케줄 결정의 선행 조건 아님",
+      "commit": null
     }
   ]
 }

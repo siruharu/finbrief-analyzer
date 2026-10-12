@@ -3,7 +3,7 @@ type: analysis
 project: finbrief-analyzer
 topic: local-schedule
 created: 2026-10-12
-status: open          # 사용자 확인 뒤 decided 로
+status: decided       # 2026-10-12 사용자 확인: A, 22:30 KST 고정, 늦어도 보낸다
 source_research: "[[2026-10-12_local-schedule]]"
 tags: [analysis, delivery-channels, schedule]
 next: plan
