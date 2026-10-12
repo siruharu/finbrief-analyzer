@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
 import httpx
 import pytest
@@ -246,8 +247,12 @@ def test_service_with_an_empty_universe_gives_no_results(store: Engine) -> None:
     assert _service(store, _KrHistory()).run(EVENING) == ()
 
 
-def test_screening_is_not_built_when_it_is_turned_off(store: Engine) -> None:
-    # given: the default
+def test_screening_is_not_built_when_it_is_turned_off(
+    store: Engine, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # given: the default, away from the developer's .env (which may turn screening on)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("APP_SCREEN_ENABLED", raising=False)
     settings = Settings()
 
     # when
