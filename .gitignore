@@ -16,3 +16,6 @@ build/
 
 # 하네스 작업 상태 (개발자별)
 .claude/state.json
+
+# 로컬 스케줄 런처 로그 (scripts/run_briefing.cmd)
+logs/
