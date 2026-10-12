@@ -80,13 +80,13 @@
     {
       "id": 8,
       "title": "로컬 스케줄: 런처, 작업 스케줄러 등록, 운영 절차",
-      "status": "doing",
+      "status": "done",
       "after": [
         7
       ],
       "verify": "powershell -NoProfile -Command \"if ((Get-ScheduledTask -TaskName finbrief-kr-open,finbrief-us-open -ErrorAction Stop | Measure-Object).Count -ne 2) { exit 1 }\" && findstr /c:\"=== exit 0\" logs\\kr_open.log && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "2026-10-12 로컬 방식으로 재정의 (docs/02_analysis/2026-10-12_local-schedule.md). terraform 판은 폐기",
-      "commit": null
+      "commit": "c60b0ce"
     },
     {
       "id": 9,
