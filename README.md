@@ -17,6 +17,26 @@ make check      # lint + typecheck + test
 
 문서는 `docs/` — 작업 흐름은 [`docs/WORKFLOW.md`](docs/WORKFLOW.md).
 
+## 설정 — 뉴스 선별·한 줄 요약 (Claude API)
+
+`.env` 에 `APP_ANTHROPIC_API_KEY` 가 있으면 수집한 뉴스(최대 80건)를 Claude 에 한 번 보내
+**7건을 골라 건별 한국어 한 줄**로 싣는다. 모델은 번호로만 고르고 제목·URL 은 코드가 원문에서 되찾는다.
+키가 없거나 호출이 실패하면 지금처럼 **최신순 10건 목록**이 간다. 메일은 항상 나간다.
+
+| 변수 | 기본값 | 뜻 |
+|---|---|---|
+| `APP_ANTHROPIC_API_KEY` | (없음 = 꺼짐) | Anthropic API 키 |
+| `APP_SUMMARY_MODEL` | `claude-opus-5-5` | PoC 비교 결과 (`docs/01_research/2026-10-12_news-summary-poc.md`) |
+| `APP_SUMMARY_EFFORT` | `low` | `low` / `medium` / `high`. medium 은 비용 1.4배, 품질 차이 없음 |
+| `APP_SUMMARY_PICKS` | `7` | 싣는 건수 (1~20) |
+| `APP_SUMMARY_MAX_TOKENS` | `2000` | 출력 상한 (thinking 포함, 관측 최대 1,200) |
+| `APP_SUMMARY_TIMEOUT_SECONDS` | `120` | 호출 타임아웃. SDK 가 2회 재시도 |
+
+- 비용: 호출당 약 $0.035, 하루 2회면 월 $2 안팎. 로그 한 줄 `summary: picks=7 input_tokens=… output_tokens=…` 로 확인한다.
+- 실패(요율 제한·타임아웃·거부·스키마 불일치)는 경고 로그 `summary unavailable` 과 메일의
+  "자동 요약을 만들지 못해 최신 기사 순으로 싣습니다." 한 줄로 드러난다.
+- 끄기: 키를 비우면 다음 실행부터 목록이다. 코드 배포 없음.
+
 ## 운영 — 로컬 스케줄
 
 브리핑은 이 PC 의 Windows 작업 스케줄러가 평일에 두 번 보낸다. AWS 는 쓰지 않는다
