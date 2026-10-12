@@ -30,7 +30,7 @@ next: implementation
 | `claude-sonnet-5-5` | medium | 4.6 | 6,665 | 443 | $0.0178 | $1.07 | 7 | 55 | 0 |
 | `claude-haiku-5-5` | medium | 2.9 | 6,665 | 435 | $0.0009 | $0.05 | 7 | 51 | 0 |
 
-- `output_tokens` 에 thinking 이 들어간다: Opus medium 1,197 vs low 435 — 눈에 보이는 7줄은 비슷한 길이다. 즉 medium 의 추가 비용은 거의 전부 thinking.
+- 표의 input·output 은 응답의 `usage.input_tokens`·`usage.output_tokens` 그대로다. `usage.output_tokens` 에 thinking 이 들어간다: Opus medium 1,197 vs low 435 — 눈에 보이는 7줄은 비슷한 길이다. 즉 medium 의 추가 비용은 거의 전부 thinking.
 - 스키마 준수: 4회 모두 `stop_reason=end_turn`, `parsed_output` 정상, **범위 밖·중복 번호·빈 줄 0건**, 전부 정확히 7건.
 - 429·refusal 없음(Evaluation 티어 한도에 걸리지 않았다).
 
