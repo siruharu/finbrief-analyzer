@@ -46,13 +46,13 @@
     {
       "id": 5,
       "title": "작성기: 요약이 있으면 줄+링크, 없으면 v0",
-      "status": "todo",
+      "status": "done",
       "after": [
         3
       ],
       "verify": "uv run pytest tests/compose && uv run ruff check . && uv run mypy && uv run pytest",
       "note": "",
-      "commit": null
+      "commit": "2c8c7fe"
     },
     {
       "id": 6,
