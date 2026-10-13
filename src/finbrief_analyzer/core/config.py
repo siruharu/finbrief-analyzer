@@ -1,6 +1,7 @@
 """Application settings loaded from environment variables / .env."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
@@ -111,6 +112,9 @@ class Settings(BaseSettings):
     # Observed maximum was 1,200 output tokens including thinking.
     summary_max_tokens: int = Field(default=2000, ge=256)
     summary_timeout_seconds: float = Field(default=120.0, gt=0)
+    # Where each briefing's chosen lines are kept for review (relative to the working
+    # directory, which the launcher sets to the repository). Empty: keep nothing.
+    summary_log_dir: Path | None = Path("logs/digests")
 
     # Marketaux free plan: 3 articles per request, 100 requests a day, two slots a day.
     marketaux_max_calls_per_slot: int = Field(default=3, ge=1, le=50)
@@ -158,7 +162,7 @@ class Settings(BaseSettings):
     operator_email: str | None = None
 
     @field_validator(
-        "marketaux_token", "dart_api_key", "ecos_api_key", "anthropic_api_key",
+        "marketaux_token", "dart_api_key", "ecos_api_key", "anthropic_api_key", "summary_log_dir",
         "db_host", "db_name", "db_user", "db_password",
         "smtp_user", "smtp_password", "operator_email",
         mode="before",

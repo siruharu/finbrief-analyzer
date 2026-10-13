@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from finbrief_analyzer.collect.factory import build_providers, make_client
@@ -30,6 +31,7 @@ from finbrief_analyzer.store.recipients import Recipient, list_active
 from finbrief_analyzer.summarize.claude import build_summarizer
 from finbrief_analyzer.summarize.models import NewsDigest
 from finbrief_analyzer.summarize.ports import Summarizer
+from finbrief_analyzer.summarize.record import save_digest
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,8 @@ class JobDeps:
     operator_email: str | None = None
     # None when no API key is configured: the news stays a plain list.
     summarize: Summarizer | None = None
+    # Where the chosen lines are kept for review; None keeps nothing.
+    digest_dir: Path | None = None
 
 
 OpenJob = Callable[[Settings], AbstractContextManager[JobDeps]]
@@ -66,6 +70,8 @@ def run(slot: Slot, now: datetime, deps: JobDeps) -> DispatchResult:
     else:
         snapshot = deps.collect(slot, now)
         digest = _summarize(deps.summarize, snapshot, slot)
+        if digest is not None and deps.digest_dir is not None:
+            save_digest(deps.digest_dir, slot, day, digest)
         expected = deps.summarize is not None and bool(snapshot.news)
         briefing = compose_simple(snapshot, day, digest, summary_expected=expected)
         result = dispatch(briefing, recipients, deps.notifier, deps.log, deps.operator_email)
@@ -129,6 +135,7 @@ def open_deps(settings: Settings) -> Iterator[JobDeps]:
             log=DeliveryLog(engine),
             operator_email=settings.operator_email,
             summarize=build_summarizer(settings),
+            digest_dir=settings.summary_log_dir,
         )
     finally:
         notifier.close()

@@ -1,6 +1,8 @@
+import json
 import logging
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import AbstractContextManager, contextmanager
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
@@ -219,6 +221,37 @@ def test_digest_lines_and_links_reach_the_mail_and_the_log(
     assert (
         "summary: picks=1 input_tokens=6000 output_tokens=400 model=claude-opus-5-5" in caplog.text
     )
+
+
+def test_digest_is_kept_as_json_when_a_directory_is_configured(
+    deps: Callable[..., JobDeps], tmp_path: Path
+) -> None:
+    # given
+    job_deps = replace(deps(summarize=FakeSummarizer(DIGEST)), digest_dir=tmp_path / "digests")
+
+    # when
+    run(Slot.KR_OPEN, NOW, job_deps)
+
+    # then: named after the briefing date and slot, carrying the lines that went out
+    saved = json.loads((tmp_path / "digests" / "2026-10-08_kr_open.json").read_text("utf-8"))
+    assert saved["items"][0]["line"] == "기사의 핵심 한 줄"
+    assert saved["model"] == "claude-opus-5-5"
+
+
+def test_nothing_is_kept_without_a_digest_or_a_directory(
+    deps: Callable[..., JobDeps], tmp_path: Path
+) -> None:
+    # given: summaries failed in one run, no directory in the other
+    failed = replace(deps(summarize=FakeSummarizer(None)), digest_dir=tmp_path / "a")
+    no_dir = deps(summarize=FakeSummarizer(DIGEST))
+
+    # when
+    run(Slot.KR_OPEN, NOW, failed)
+    run(Slot.US_OPEN, NOW, no_dir)
+
+    # then
+    assert not (tmp_path / "a").exists()
+    assert no_dir.digest_dir is None
 
 
 def test_failed_summary_falls_back_to_the_plain_list_with_a_note_and_a_warning(
